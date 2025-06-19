@@ -1,16 +1,48 @@
-    <div class="w-full max-w-md h-full max-h-lvh rounded-md content-center bg-amber-300">
-        <p>There should be stuff here</p>
+    <div class="w-full max-w-md h-full max-h-lvh rounded-md content-center bg-blue-300 ">
+        <label for="spotName">Name: </label>
+        <input type="text" id="spotName" name="spotName" class="bg-white-100">
         
-        <svg
-        xmlns="http://www.w3.org/2000/svg"
-        viewBox="0 0 982 239"
-        fill="none"
-        class="angular-logo"
-        ></svg>
 
-        
+        <hr class="my-5 border-dashed"/>
         <div>
-            
+            <form>
+                <label for="power">Charging Outlets?</label>
+                <input type="checkbox" id="power" name="power" value="Power" class="w-5 h-4  ml-1">
+                <br>
+
+                <label for="seating">Amount of Seating (0-10)</label><br>
+                <input type="range" id="seating" name="seating" value="0" min="0" max="10" class="border-hidden">
+                <br>
+
+                <label for="quality">Coffee Quality (0-10)</label><br>
+                <input type="range" id="quality" name="quality" value="0" min="0" max="10" class="border-hidden">
+                <br>
+
+                <label for="affordable">Affordable</label>
+                <input type="radio" id="affordable" name="price" class="border-2 rounded-md w-10">
+                <br>
+                <label for="cheap">Cheap</label>
+                <input type="radio" id="cheap" name="price" class="border-2 rounded-md w-10">
+                <br>
+                <label for="expensive">Expensive</label>
+                <input type="radio" id="expensive" name="price" class="border-2 rounded-md w-10">
+                <br>
+                <label for="insane">Break the bank</label>
+                <input type="radio" id="insane" name="price" class="border-2 rounded-md w-10">
+                <br>
+
+                <label for="howLate">How late do they stay open?</label>
+                <input type="time" id="howLate" name="howLate" step="360" class="border-2 rounded-md">
+
+                <br>
+                <label for="drinkOrder">Drink Order</label>
+                <input type="text" id="drinkOrder" name="drinkOrder" class="border-2 rounded-md">
+
+                <br>
+                <label for="notes">Extra Notes:</label>
+                <textarea id="notes" name="notes" placeholder="Describe the vibe" class="w-3/4 block p-2.5 text-sm border-2 rounded-md placeholder:opacity-40"></textarea>
+                
+            </form>
         </div>
     </div>
 
