@@ -1,0 +1,6 @@
+@study_spot_backend_HostAddress = http://localhost:8080
+
+GET {{study_spot_backend_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
