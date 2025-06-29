@@ -2,8 +2,21 @@ using study_spot_backend;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Middleware
+builder.Services.AddCors(options =>
+{
+    options.AddDefaultPolicy(policy  =>
+        {
+            policy.WithOrigins("http://localhost:4200")
+                .AllowAnyHeader()
+                .AllowAnyMethod();
+        });
+});
+
 builder.Services.AddDbContext<AppDbContext>(opt => opt.UseInMemoryDatabase("StudySpotDb"));
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();
+
 var app = builder.Build();
 
 app.MapGet("/studyspots", async (AppDbContext db) =>
@@ -48,5 +61,7 @@ app.MapPost("/studyspots", async (StudySpot studySpot, AppDbContext db) =>
 //
 //     return Results.NotFound();
 // });
+
+app.UseCors();
 
 app.Run();
