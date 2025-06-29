@@ -2,22 +2,19 @@ using study_spot_backend;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
-builder.Services.AddDbContext<AppDbContext>(opt => opt.UseInMemoryDatabase("TodoList"));
+builder.Services.AddDbContext<AppDbContext>(opt => opt.UseInMemoryDatabase("StudySpotDb"));
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 var app = builder.Build();
 
 app.MapGet("/studyspots", async (AppDbContext db) =>
     await db.StudySpots.ToListAsync());
 
-// app.MapGet("/todoitems/complete", async (AppDbContext db) =>
-//     await db.StudySpots.Where(t => t.IsComplete).ToListAsync());
-//
-// app.MapGet("/todoitems/{id}", async (int id, AppDbContext db) =>
-//     await db.StudySpots.FindAsync(id)
-//         is StudySpot studySpot
-//         ? Results.Ok(studySpot)
-//         : Results.NotFound());
-//
+app.MapGet("/studyspots/{id}", async (int id, AppDbContext db) =>
+    await db.StudySpots.FindAsync(id)
+        is StudySpot studySpot
+        ? Results.Ok(studySpot)
+        : Results.NotFound());
+
 app.MapPost("/studyspots", async (StudySpot studySpot, AppDbContext db) =>
 {
     db.StudySpots.Add(studySpot);
