@@ -1,5 +1,5 @@
 import { Component, OnInit } from '@angular/core';
-import { FormsModule } from '@angular/forms';
+import { FormsModule, NgForm } from '@angular/forms';
 import { StudySpotService, StudySpot } from '../../services/study-spot.service';
 
 @Component({
@@ -21,7 +21,7 @@ export class SpotCardComponent implements OnInit {
       console.log(data);      
     });
   }
-  createStudySpot() {
-    
+  onSubmit(f: NgForm) {
+    console.log(f.value);
   }
 }
