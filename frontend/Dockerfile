@@ -9,6 +9,7 @@ RUN npm run build
 
 # Then serve it with Nginx
 FROM nginx:alpine
-COPY --from=builder /app/dist/study-spot-app /usr/share/nginx/html
+# Since we're using Angular Universal (SSR), it outputs to the 'browser' file.
+COPY --from=builder /app/dist/study-spot-app/browser /usr/share/nginx/html 
 COPY ./nginx.conf /etc/nginx/conf.d/default.conf
 EXPOSE 80

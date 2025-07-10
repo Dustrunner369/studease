@@ -15,11 +15,12 @@ export class SpotCardComponent implements OnInit {
 
   // This function is called when the component is loaded into the DOM
   ngOnInit(): void {
-    this.studySpotService.getStudySpots().subscribe(data => {
-      console.log("Fetching study spots...");
-      this.studySpots = data;
-      console.log(data);      
-    });
+    console.log("we are here");
+    // this.studySpotService.getStudySpots().subscribe(data => {
+    //   console.log("Fetching study spots...");
+    //   this.studySpots = data;
+    //   console.log(data);      
+    // });
   }
   onSubmit(f: NgForm) {
     console.log(f.value);
