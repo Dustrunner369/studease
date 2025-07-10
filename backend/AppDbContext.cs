@@ -16,7 +16,7 @@ namespace study_spot_backend
         protected override void OnConfiguring(DbContextOptionsBuilder options)
         {
             // Connect to postgres DB with connection string from app settings
-            options.UseNpgsql(Configuration.GetConnectionString("WebAPIDatabase"));
+            options.UseNpgsql(Configuration.GetConnectionString("DefaultConnection"));
         }
 
         public DbSet<StudySpot> StudySpots => Set<StudySpot>();

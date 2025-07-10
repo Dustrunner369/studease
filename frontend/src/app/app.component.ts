@@ -1,11 +1,10 @@
 import { Component } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
-import { CardComponent } from "./card.component";
 import { SpotCardComponent } from './spot-card/spot-card.component';
 
-@Component({
+@Component({  
   selector: 'app-root',
-  imports: [RouterOutlet, CardComponent, SpotCardComponent],
+  imports: [RouterOutlet, SpotCardComponent],
   templateUrl: './app.component.html',  
 })
 export class AppComponent {

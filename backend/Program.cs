@@ -14,10 +14,18 @@ builder.Services.AddCors(options =>
         });
 });
 
-builder.Services.AddDbContext<AppDbContext>(opt => opt.UseInMemoryDatabase("StudySpotDb"));
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+
+builder.Services.AddDbContext<AppDbContext>(opt => opt.UseNpgsql(connectionString));
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 
 var app = builder.Build();
+
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    db.Database.Migrate();
+}
 
 app.MapGet("/studyspots", async (AppDbContext db) =>
     await db.StudySpots.ToListAsync());
@@ -31,6 +39,7 @@ app.MapGet("/studyspots/{id}", async (int id, AppDbContext db) =>
 app.MapPost("/studyspots", async (StudySpot studySpot, AppDbContext db) =>
 {
     db.StudySpots.Add(studySpot);
+
     await db.SaveChangesAsync();
 
     return Results.Created($"/studyspots/{studySpot.Id}", studySpot);

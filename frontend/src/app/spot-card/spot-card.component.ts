@@ -2,7 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { FormsModule, NgForm } from '@angular/forms';
 import { StudySpotService, StudySpot } from '../../services/study-spot.service';
 
-@Component({
+@Component({ 
   selector: 'app-spot-card',
   imports: [FormsModule],
   templateUrl: './spot-card.component.html',
@@ -14,15 +14,18 @@ export class SpotCardComponent implements OnInit {
   constructor(private studySpotService: StudySpotService) {}
 
   // This function is called when the component is loaded into the DOM
-  ngOnInit(): void {
-    console.log("we are here");
-    // this.studySpotService.getStudySpots().subscribe(data => {
-    //   console.log("Fetching study spots...");
-    //   this.studySpots = data;
-    //   console.log(data);      
-    // });
+  ngOnInit(): void {    
+    this.studySpotService.getStudySpots().subscribe(data => {
+      console.log("Fetching study spots...");
+      this.studySpots = data;
+      console.log(data);      
+    });
   }
-  onSubmit(f: NgForm) {
-    console.log(f.value);
+  onSubmit(f: NgForm) {    
+    console.log(f.value);  
+    
+    this.studySpotService.createStudySpot(f.value).subscribe(result => {
+      console.log(result);
+    });
   }
 }
