@@ -5,8 +5,12 @@
         <hr class="my-5 border-dashed"/>
         <div>
             <form #f="ngForm" (ngSubmit)="onSubmit(f)" novalidate>
-                <label for="spotName">Name: </label>
-                <input ngModel type="text" id="spotName" name="spotName" class="bg-white-100">
+                <label for="name">Name: </label>
+                <input ngModel type="text" id="name" name="name" class="bg-white-100">
+                <br>
+
+                <label for="address">Address: </label>
+                <input ngModel type="text" id="address" name="address" class="bg-white-100">
                 <br>
 
                 <label for="power">Charging Outlets?</label>
@@ -17,25 +21,25 @@
                 <input ngModel type="range" id="seating" name="seating" value="0" min="0" max="10" class="border-hidden">
                 <br>
 
-                <label for="quality">Coffee Quality (0-10)</label><br>
-                <input ngModel type="range" id="quality" name="quality" value="0" min="0" max="10" class="border-hidden">
+                <label for="coffeeQuality">Coffee Quality (0-10)</label><br>
+                <input ngModel type="range" id="coffeeQuality" name="coffeeQuality" value="0" min="0" max="10" class="border-hidden">
                 <br>
 
                 <label for="affordable">Affordable</label>
-                <input ngModel type="radio" id="affordable" name="price" class="border-2 rounded-md w-10">
+                <input ngModel type="radio" id="affordable" name="generalPrice" class="border-2 rounded-md w-10">
                 <br>
                 <label for="cheap">Cheap</label>
-                <input ngModel type="radio" id="cheap" name="price" class="border-2 rounded-md w-10">
+                <input ngModel type="radio" id="cheap" name="generalPrice" class="border-2 rounded-md w-10">
                 <br>
                 <label for="expensive">Expensive</label>
-                <input ngModel type="radio" id="expensive" name="price" class="border-2 rounded-md w-10">
+                <input ngModel type="radio" id="expensive" name="generalPrice" class="border-2 rounded-md w-10">
                 <br>
                 <label for="insane">Break the bank</label>
-                <input ngModel type="radio" id="insane" name="price" class="border-2 rounded-md w-10">
+                <input ngModel type="radio" id="insane" name="generalPrice" class="border-2 rounded-md w-10">
                 <br>
 
-                <label for="howLate">How late do they stay open?</label>
-                <input ngModel type="time" id="howLate" name="howLate" step="360" class="border-2 rounded-md">
+                <label for="openUntil">How late do they stay open?</label>
+                <input ngModel type="time" id="openUntil" name="openUntil" step="360" class="border-2 rounded-md">
 
                 <br>
                 <label for="drinkOrder">Drink Order</label>

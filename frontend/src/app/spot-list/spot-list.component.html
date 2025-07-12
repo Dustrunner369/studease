@@ -1,0 +1,13 @@
+<div>
+    <button>+ Add New Spot</button>
+    <div>
+        <ul>
+            @for (spot of studySpots; track spot.id) {
+                <li>{{ spot.name }} | {{ spot.id }}</li>
+                <hr>
+            } @empty {
+                <li>No spots saved.</li>
+            }
+        </ul>
+    </div>
+</div>

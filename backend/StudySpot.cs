@@ -9,7 +9,7 @@ public class StudySpot
     public int Seating { get; set; }
     public int CoffeeQuality { get; set; }
     public string? GeneralPrice { get; set; }
-    public DateTime OpenUntil { get; set; }
+    public TimeSpan OpenUntil { get; set; }
     public string? DrinkOrder { get; set; }
     public string? ExtraNotes { get; set; }
 }
