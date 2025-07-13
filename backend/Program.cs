@@ -21,21 +21,25 @@ builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 
 var app = builder.Build();
 
+// Automatically applies any database migrations at runtime
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     db.Database.Migrate();
 }
 
+// Returns list of study spots
 app.MapGet("/studyspots", async (AppDbContext db) =>
     await db.StudySpots.ToListAsync());
 
+// Fetches a study spot by Id
 app.MapGet("/studyspots/{id}", async (int id, AppDbContext db) =>
     await db.StudySpots.FindAsync(id)
         is StudySpot studySpot
         ? Results.Ok(studySpot)
         : Results.NotFound());
 
+// Creates a new study spot
 app.MapPost("/studyspots", async (StudySpot studySpot, AppDbContext db) =>
 {
     db.StudySpots.Add(studySpot);

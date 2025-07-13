@@ -12,8 +12,8 @@ using study_spot_backend;
 namespace study_spot_backend.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20250712035918_init")]
-    partial class init
+    [Migration("20250713000434_Initial")]
+    partial class Initial
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -54,8 +54,8 @@ namespace study_spot_backend.Migrations
                     b.Property<string>("Name")
                         .HasColumnType("text");
 
-                    b.Property<TimeSpan>("OpenUntil")
-                        .HasColumnType("interval");
+                    b.Property<DateTime>("OpenUntil")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<int>("Seating")
                         .HasColumnType("integer");
