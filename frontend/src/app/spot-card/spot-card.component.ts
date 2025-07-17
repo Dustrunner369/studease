@@ -15,12 +15,7 @@ export class SpotCardComponent {
   onSubmit(f: NgForm) {    
     console.log(f.value);  
     
-    const formData = {
-      ...f.value,
-      openUntil: new Date(f.value.openUntil).toISOString(), // Convert to ISO 8601
-    };
-
-    this.studySpotService.createStudySpot(formData).subscribe({
+    this.studySpotService.createStudySpot(f.value).subscribe({
       next: (result) => {
         console.log('Success:', result);
       },
