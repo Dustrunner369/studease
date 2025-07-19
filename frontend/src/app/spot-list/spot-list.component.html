@@ -1,12 +1,11 @@
-<div>
-    <button>+ Add New Spot</button>
-    <div>
-        <ul>
+<div class="w-96">    
+    <div>        
+        <ul class="list bg-base-100 rounded-box shadow-md">            
+            <li class="list-row"><button class="btn">+ Add New Spot</button></li>
             @for (spot of studySpots; track spot.id) {
-                <li>{{ spot.name }} | {{ spot.id }}</li>
-                <hr>
+                <li class="list-row">{{ spot.name }} | {{ spot.id }}</li>                
             } @empty {
-                <li>No spots saved.</li>
+                <li class="list-row">No spots saved.</li>
             }
         </ul>
     </div>
