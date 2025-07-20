@@ -10,18 +10,4 @@ import { StudySpotService } from '../../services/study-spot.service';
 })
 export class SpotCardComponent {
   
-  constructor(private studySpotService: StudySpotService) {}
-
-  onSubmit(f: NgForm) {    
-    console.log(f.value);  
-    
-    this.studySpotService.createStudySpot(f.value).subscribe({
-      next: (result) => {
-        console.log('Success:', result);
-      },
-      error: (error) => {
-        console.log('There was a failure creating a study spot.', error);
-      }      
-    });
-  }
 }
