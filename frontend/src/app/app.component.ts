@@ -5,7 +5,7 @@ import { SpotListComponent } from './spot-list/spot-list.component';
 
 @Component({  
   selector: 'app-root',
-  imports: [RouterOutlet, SpotCardComponent, SpotListComponent, ],
+  imports: [RouterOutlet, SpotCardComponent, SpotListComponent ],
   templateUrl: './app.component.html',  
 })
 export class AppComponent {

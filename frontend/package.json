@@ -20,6 +20,8 @@
     "@angular/platform-server": "^19.2.0",
     "@angular/router": "^19.2.0",
     "@angular/ssr": "^19.2.12",
+    "@ng-icons/core": "^31.4.0",
+    "@ng-icons/lucide": "^32.1.0",
     "@tailwindcss/postcss": "^4.1.11",
     "express": "^4.18.2",
     "rxjs": "~7.8.0",
