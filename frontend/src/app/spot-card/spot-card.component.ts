@@ -28,7 +28,12 @@ export class SpotCardComponent {
   formatTime = (date: Date) => {
     return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   }
-  formatCoffeeQualiy = (quality: number) => {
-    return
-  };
+
+  //TODO: Display 10 coffee icons that are highlighted depending on the coffee quality.
+  // formatCoffeeQualiy = (quality: number) => {
+  //   return
+  // };
+  formatCharging = (hasCharging: Boolean) => {
+    return hasCharging ? "Available" : "Unavailable";
+  }
 }

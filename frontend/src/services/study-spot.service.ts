@@ -4,13 +4,13 @@ import { Observable } from "rxjs";
 
 export interface StudySpot {
     id?: number; // Id is nullable because when we are creating a study spot in the frontend, we don't yet know what the Id will be.
-    name: string;
-    address: string;
-    hasCharging: boolean;
-    seating: number;
-    coffeeQuality: number;
-    generalPrice: string;
-    openUntil: Date;
+    name: string; // Displayed in form
+    address: string; // Displayed in form
+    hasCharging: boolean; // Displayed in form
+    seating: number; // Displayed in form
+    coffeeQuality: number; // Displayed in form
+    generalPrice: string; // Displayed in form
+    openUntil: Date; // Displayed in form
     drinkOrder: string;
     extraNotes?: string;
 }

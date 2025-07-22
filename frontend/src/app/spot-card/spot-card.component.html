@@ -1,17 +1,34 @@
-<div class="card h-screen w-192 ml-auto shadow-md">
+<div class="card shadow-md">
     <div class="m-4 w-192">
         <div class="text-3xl font-semibold">{{ selectedSpot.name }}</div>
-        <div class="text-xl font-thin"><ng-icon name="lucideMapPin"></ng-icon> {{ selectedSpot.address }}</div>
+        <div class="text-lg font-thin flex items-center">
+            <ng-icon name="lucideMapPin" class="mr-1"></ng-icon> {{ selectedSpot.address }}
+        </div>
 
         <hr class="font-thin w-1/2 opacity-20 mt-2">
 
-        <div name="generalInfo">
+        <div name="generalInfo" class="mt-4">
             <div class="list-row">Open Until 
                 <span class="list-col-grow">{{ formatTime(selectedSpot.openUntil) }}</span>
             </div>
-            <div class="range">{{ selectedSpot.seating }}</div>
+            <div>
+                General Seating {{ selectedSpot.seating }}
+            </div>
             <div> Coffee Quality
                 <span>{{ selectedSpot.coffeeQuality }}</span>
+            </div>
+            <div>
+                Charging? 
+                <span>{{ formatCharging(selectedSpot.hasCharging) }}</span>
+            </div>
+            <div>
+                General Price <span>{{ selectedSpot.generalPrice }}</span>
+            </div>
+            <div>
+                Drink Order <span>{{ selectedSpot.drinkOrder }}</span>
+            </div>
+            <div class="card">
+                Extra Notes: {{ selectedSpot.extraNotes }}
             </div>
         </div>
     </div>
