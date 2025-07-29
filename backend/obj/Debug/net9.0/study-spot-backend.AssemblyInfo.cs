@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("study-spot-backend")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+e7969c54952728c7d4dd6d665328dbdb2b915caa")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+7a8c794ec8ab999b96948d4831ec1b4d39e68c25")]
 [assembly: System.Reflection.AssemblyProductAttribute("study-spot-backend")]
 [assembly: System.Reflection.AssemblyTitleAttribute("study-spot-backend")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
