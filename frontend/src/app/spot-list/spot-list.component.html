@@ -3,8 +3,8 @@
         <ul class="list bg-base-100 rounded-box shadow-md">            
             <li class="list-row"><button class="btn text-lg">+ Add New Spot</button></li>
             @for (spot of studySpots; track spot.id) {
-                <li class="list-row flex justify-between items-center text-xl">
-                    <div id="list-content" class="w-full h-full hover:bg-base-200 hover:border-1 rounded-md p-1">
+                <li class="list-row flex justify-between items-center text-xl" (click)="changeSelectedSpot($event)">
+                    <div id="list-content" class="w-full h-full hover:bg-base-200 rounded-md p-1">
                         <span>{{ spot.name }}</span>
                         <div class="text-3xl font-thin opacity-30 tabular-nums">3.4/5</div>
                     </div>

@@ -80,4 +80,7 @@ export class SpotListComponent implements OnInit {
     //   console.log(data);      
     // });
   }
+  changeSelectedSpot(event: MouseEvent): void {
+    console.log(event);
+  }
 }
