@@ -8,11 +8,35 @@
         <hr class="font-thin w-1/2 opacity-20 mt-2">
 
         <div name="generalInfo" class="mt-4">
-            <div class="list-row">Open Until 
+            <div class="list-row text-lg">Open Until: 
                 <span class="list-col-grow">{{ formatTime(selectedSpot.openUntil) }}</span>
             </div>
-            <div>
-                General Seating {{ selectedSpot.seating }}
+            <div class="w-full max-w-xs">
+                General Seating {{ selectedSpot.seating }} <input type="range" min="0" max="10" value="{{ selectedSpot.seating }}" class="range" step="1" readonly />
+                <div class="flex justify-between px-3 mt-2 text-xs">
+                    <span>|</span>
+                    <span>|</span>
+                    <span>|</span>
+                    <span>|</span>
+                    <span>|</span>
+                    <span>|</span>
+                    <span>|</span>
+                    <span>|</span>
+                    <span>|</span>
+                    <span>|</span>
+                </div>
+                <div class="flex justify-between px-3 mt-2 text-xs">
+                    <span>1</span>
+                    <span>2</span>
+                    <span>3</span>
+                    <span>4</span>
+                    <span>5</span>
+                    <span>6</span>
+                    <span>7</span>
+                    <span>8</span>
+                    <span>9</span>
+                    <span>10</span>
+                </div>
             </div>
             <div> Coffee Quality
                 <span>{{ selectedSpot.coffeeQuality }}</span>

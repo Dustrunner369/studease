@@ -17,7 +17,7 @@ export class SpotCardComponent {
       name: "Brew & Books",
       address: "123 Library Lane, Booktown",
       hasCharging: true,
-      seating: 25,
+      seating: 1,
       coffeeQuality: 8,
       generalPrice: "$$",
       openUntil: new Date("2025-07-19T22:00:00"),
