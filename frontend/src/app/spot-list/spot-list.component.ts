@@ -8,6 +8,11 @@ import { StudySpotService, StudySpot } from '../../services/study-spot.service';
   styleUrl: './spot-list.component.css'
 })
 export class SpotListComponent implements OnInit {
+  selectedSpot: StudySpot | null = null;
+  
+  
+  //@Output() restaurantSelected = new EventEmitter<Restaurant>();
+
   studySpots: StudySpot[] = [
   {
     id: 1,
@@ -80,7 +85,7 @@ export class SpotListComponent implements OnInit {
     //   console.log(data);      
     // });
   }
-  changeSelectedSpot(event: MouseEvent): void {
-    console.log(event);
+  changeSelectedSpot(spot: StudySpot): void {
+    
   }
 }
