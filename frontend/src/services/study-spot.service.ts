@@ -1,6 +1,7 @@
 import { HttpClient } from "@angular/common/http";
 import { Injectable } from "@angular/core";
 import { Observable } from "rxjs";
+import data from "../../db.json"
 
 export interface StudySpot {
     id?: number; // Id is nullable because when we are creating a study spot in the frontend, we don't yet know what the Id will be.
@@ -39,67 +40,10 @@ export class StudySpotService {
         return this.http.get<StudySpot>(`${this.baseUrl}/${id}`);
     }
 
-    // TEMP
-    studySpots: StudySpot[] = [
-        {
-            id: 1,
-            name: "Brew & Books",
-            address: "123 Library Lane, Booktown",
-            hasCharging: true,
-            seating: 25,
-            coffeeQuality: 8,
-            generalPrice: "$$",
-            openUntil: new Date("2025-07-19T22:00:00"),
-            drinkOrder: "Vanilla latte",
-            extraNotes: "Quiet back room with good lighting."
-        },
-        {
-            id: 2,
-            name: "Caffeine Corner",
-            address: "456 Java Street, Beanville",
-            hasCharging: false,
-            seating: 15,
-            coffeeQuality: 7,
-            generalPrice: "$",
-            openUntil: new Date("2025-07-19T20:00:00"),
-            drinkOrder: "Iced americano"
-        },
-        {
-            id: 3,
-            name: "Study Grounds",
-            address: "789 Focus Blvd, Studytown",
-            hasCharging: true,
-            seating: 40,
-            coffeeQuality: 9,
-            generalPrice: "$$$",
-            openUntil: new Date("2025-07-19T23:00:00"),
-            drinkOrder: "Flat white",
-            extraNotes: "Fast WiFi and great ambient music."
-        },
-        {
-            id: 4,
-            name: "The Thinking Cup",
-            address: "321 Idea Ave, Brain City",
-            hasCharging: true,
-            seating: 30,
-            coffeeQuality: 6,
-            generalPrice: "$$",
-            openUntil: new Date("2025-07-19T21:30:00"),
-            drinkOrder: "Chai latte"
-        },
-        {
-            id: 5,
-            name: "Notes & Nibbles",
-            address: "654 Memoir Rd, Notetown",
-            hasCharging: false,
-            seating: 20,
-            coffeeQuality: 7,
-            generalPrice: "$$",
-            openUntil: new Date("2025-07-19T19:00:00"),
-            drinkOrder: "Cappuccino",
-            extraNotes: "Limited outlets, but cozy atmosphere."
-        }
-    ];
+    studySpots: StudySpot[] = data.map(spot => ({
+        ...spot,
+        openUntil: new Date(spot.openUntil)
+    }));
 
     selectedSpot: StudySpot | null = this.studySpots[0]; 
 
