@@ -40,6 +40,8 @@ export class StudySpotService {
         return this.http.get<StudySpot>(`${this.baseUrl}/${id}`);
     }
 
+    // Since date is a string in the JSON, we need to convert it to 
+    // a date object when importing it.
     studySpots: StudySpot[] = data.map(spot => ({
         ...spot,
         openUntil: new Date(spot.openUntil)
