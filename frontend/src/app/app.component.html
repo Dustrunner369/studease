@@ -1,5 +1,11 @@
-<div class="flex h-screen px-4 py-6 space-x-6">
-    <app-spot-list class="flex-1"></app-spot-list>
-    <app-spot-card class="w-full max-w-[48rem] ml-auto"></app-spot-card>
-    <router-outlet />
+<div class="flex flex-col h-screen bg-base-100">
+  <header class="px-8 pt-8 pb-4">
+    <h1 class="font-display text-3xl font-semibold tracking-tight text-base-content"></h1>    
+  </header>
+
+  <main class="flex flex-1 overflow-hidden px-8 pb-8 gap-8">
+    <app-spot-list class="w-80 shrink-0 flex flex-col"></app-spot-list>
+    <app-spot-card class="flex-1 min-w-0"></app-spot-card>
+  </main>
 </div>
+<router-outlet />

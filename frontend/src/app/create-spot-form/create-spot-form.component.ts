@@ -1,29 +1,28 @@
-import { Component, Output, EventEmitter } from '@angular/core';
+import { Component, EventEmitter, Output } from '@angular/core';
 import { FormsModule, NgForm } from '@angular/forms';
 import { StudySpotService } from '../../services/study-spot.service';
-import { NgIf } from '@angular/common';
+import { NgIcon } from '@ng-icons/core';
 
-@Component({ 
+@Component({
   selector: 'app-create-spot-form',
-  imports: [FormsModule, NgIf],
+  imports: [FormsModule, NgIcon],
   templateUrl: './create-spot-form.component.html',
   styleUrl: './create-spot-form.component.css'
 })
 export class CreateSpotFormComponent {
-  @Output() close: EventEmitter<void> = new EventEmitter<void>();
+  @Output() close = new EventEmitter<void>();
 
   constructor(private studySpotService: StudySpotService) {}
 
-  onSubmit(f: NgForm) {    
-    console.log(f.value);  
-    
+  onSubmit(f: NgForm) {
     this.studySpotService.createStudySpot(f.value).subscribe({
       next: (result) => {
         console.log('Success:', result);
+        this.closeModal();
       },
       error: (error) => {
         console.log('There was a failure creating a study spot.', error);
-      }      
+      }
     });
   }
 

@@ -1,10 +1,17 @@
-import { ApplicationConfig, provideZoneChangeDetection, importProvidersFrom } from '@angular/core';
+import { ApplicationConfig, provideZoneChangeDetection } from '@angular/core';
 import { provideRouter } from '@angular/router';
 import { provideClientHydration, withEventReplay } from '@angular/platform-browser';
 import { provideHttpClient } from '@angular/common/http';
 import { routes } from './app.routes';
-import { lucideMapPin } from '@ng-icons/lucide';
 import { provideIcons } from '@ng-icons/core';
+import {
+  lucideMapPin,
+  lucideClock,
+  lucideZap,
+  lucideCoffee,
+  lucidePlus,
+  lucideX
+} from '@ng-icons/lucide';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -13,7 +20,12 @@ export const appConfig: ApplicationConfig = {
     provideClientHydration(withEventReplay()),
     provideHttpClient(),
     provideIcons({
-      lucideMapPin
+      lucideMapPin,
+      lucideClock,
+      lucideZap,
+      lucideCoffee,
+      lucidePlus,
+      lucideX
     })
   ]
 };

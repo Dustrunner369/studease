@@ -1,20 +1,38 @@
-<div class="w-96">
-    <div>        
-        <ul class="list bg-base-100 rounded-box shadow-md">            
-            <li class="list-row"><button (click)="showModal()" class="btn text-lg">+ Add New Spot</button></li>
-            @for (spot of studySpots; track spot.id) {
-                <li class="list-row flex justify-between items-center text-xl" (click)="changeSelectedSpot(spot)">
-                    <div id="list-content" class="w-full h-full hover:bg-base-200 rounded-md p-1">
-                        <span>{{ spot.name }}</span>
-                        <div class="text-3xl font-thin opacity-30 tabular-nums">3.4/5</div>
-                    </div>
-                </li>
-            } @empty {
-                <li class="list-row">No spots saved.</li>
-            }
-        </ul>
-        @if (isModalVisible) {
-            <app-create-spot-form (close)="hideModal()"></app-create-spot-form>
-        }
-    </div>
+<div class="flex items-center justify-between mb-5">
+  <h2 class="font-display text-xl font-semibold text-base-content">My Spots</h2>
+  <button (click)="showModal()" class="btn btn-primary btn-sm gap-1.5 rounded-xl">
+    <ng-icon name="lucidePlus" size="14"></ng-icon>
+    Add Spot
+  </button>
 </div>
+
+<div class="flex-1 overflow-y-auto space-y-2.5 p-1">
+  @for (spot of studySpots; track spot.id) {
+    <div class="p-4 rounded-2xl cursor-pointer transition-all duration-200"
+         [class]="selectedSpot?.id === spot.id
+           ? 'bg-primary/8 ring-1 ring-primary/20'
+           : 'hover:bg-base-200/60'"
+         (click)="changeSelectedSpot(spot)">
+      <div class="font-semibold text-base-content leading-snug">{{ spot.name }}</div>
+      <div class="text-sm text-base-content/40 mt-1 flex items-center gap-1">
+        <ng-icon name="lucideMapPin" size="12"></ng-icon>
+        <span class="truncate">{{ spot.address }}</span>
+      </div>
+      @if (spot.drinkOrder) {
+        <p class="text-xs text-base-content/35 mt-2.5 italic leading-relaxed">"{{ spot.drinkOrder }}"</p>
+      }
+      <div class="mt-2.5">
+        <span class="text-xs font-semibold text-primary/70 bg-primary/8 px-2 py-0.5 rounded-lg">{{ spot.generalPrice }}</span>
+      </div>
+    </div>
+  } @empty {
+    <div class="text-center py-16 text-base-content/30">
+      <p class="font-display text-lg">No spots saved yet</p>
+      <p class="text-sm mt-1">Add your first favorite study spot</p>
+    </div>
+  }
+</div>
+
+@if (isModalVisible) {
+  <app-create-spot-form (close)="hideModal()"></app-create-spot-form>
+}

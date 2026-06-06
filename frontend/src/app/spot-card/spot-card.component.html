@@ -1,63 +1,74 @@
-<div class="card shadow-md">
-    <div class="m-4 w-192">
-        @if (selectedSpot) {
-            <div class="text-3xl font-semibold">{{ selectedSpot.name }}</div>
-        
-            <div class="text-lg font-thin flex items-center">
-                <ng-icon name="lucideMapPin" class="mr-1"></ng-icon> {{ selectedSpot.address }}
+<div class="h-full bg-base-200/40 rounded-2xl overflow-hidden">
+  <div class="h-full overflow-y-auto p-8">
+    @if (selectedSpot) {
+      <h2 class="font-display text-4xl font-semibold tracking-tight text-base-content leading-tight">
+        {{ selectedSpot.name }}
+      </h2>
+      <div class="flex items-center gap-1.5 text-base-content/45 mt-2.5">
+        <ng-icon name="lucideMapPin" size="15"></ng-icon>
+        <span>{{ selectedSpot.address }}</span>
+      </div>
+
+      <div class="w-12 h-px bg-base-content/10 mt-7 mb-7"></div>
+
+      <div class="flex items-center gap-2 text-base-content/55 text-sm">
+        <ng-icon name="lucideClock" size="15"></ng-icon>
+        <span>Open until {{ formatTime(selectedSpot.openUntil) }}</span>
+      </div>
+
+      <div class="grid grid-cols-2 gap-x-8 gap-y-5 mt-7">
+        <div>
+          <div class="text-xs text-base-content/35 uppercase tracking-wider mb-2">Coffee</div>
+          <div class="flex items-center gap-3">
+            <div class="flex-1 h-1.5 rounded-full bg-base-300/60 overflow-hidden">
+              <div class="h-full rounded-full bg-primary/70 transition-all duration-500"
+                   [style.width.%]="barWidth(selectedSpot.coffeeQuality)"></div>
             </div>
-
-            <hr class="font-thin w-1/2 opacity-20 mt-2">
-
-            <div name="generalInfo" class="mt-4">
-                <div class="list-row text-lg">Open Until: 
-                    <span class="list-col-grow">{{ formatTime(selectedSpot.openUntil) }}</span>
-                </div>
-                <div class="w-full max-w-xs">
-                    General Seating {{ selectedSpot.seating }} <input type="range" min="0" max="10" value="{{ selectedSpot.seating }}" class="range" step="1" readonly />
-                    <div class="flex justify-between px-3 mt-2 text-xs">
-                        <span>|</span>
-                        <span>|</span>
-                        <span>|</span>
-                        <span>|</span>
-                        <span>|</span>
-                        <span>|</span>
-                        <span>|</span>
-                        <span>|</span>
-                        <span>|</span>
-                        <span>|</span>
-                    </div>
-                    <div class="flex justify-between px-3 mt-2 text-xs">
-                        <span>1</span>
-                        <span>2</span>
-                        <span>3</span>
-                        <span>4</span>
-                        <span>5</span>
-                        <span>6</span>
-                        <span>7</span>
-                        <span>8</span>
-                        <span>9</span>
-                        <span>10</span>
-                    </div>
-                </div>
-                <div> Coffee Quality
-                    <span>{{ selectedSpot.coffeeQuality }}</span>
-                </div>
-                <div>
-                    Charging? 
-                    <span>{{ formatCharging(selectedSpot.hasCharging) }}</span>
-                </div>
-                <div>
-                    General Price <span>{{ selectedSpot.generalPrice }}</span>
-                </div>
-                <div>
-                    Drink Order <span>{{ selectedSpot.drinkOrder }}</span>
-                </div>
-                <div class="card">
-                    Extra Notes: {{ selectedSpot.extraNotes }}
-                </div>
-
+            <span class="text-sm font-semibold text-base-content/60 tabular-nums w-4 text-right">{{ selectedSpot.coffeeQuality }}</span>
+          </div>
+        </div>
+        <div>
+          <div class="text-xs text-base-content/35 uppercase tracking-wider mb-2">Seating</div>
+          <div class="flex items-center gap-3">
+            <div class="flex-1 h-1.5 rounded-full bg-base-300/60 overflow-hidden">
+              <div class="h-full rounded-full bg-primary/70 transition-all duration-500"
+                   [style.width.%]="barWidth(selectedSpot.seating)"></div>
             </div>
+            <span class="text-sm font-semibold text-base-content/60 tabular-nums w-4 text-right">{{ selectedSpot.seating }}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-5 mt-7 text-sm">
+        <div class="flex items-center gap-1.5"
+             [class]="selectedSpot.hasCharging ? 'text-base-content/60' : 'text-base-content/25'">
+          <ng-icon name="lucideZap" size="14"
+                   [class]="selectedSpot.hasCharging ? 'text-warning' : ''"></ng-icon>
+          <span>{{ selectedSpot.hasCharging ? 'Charging available' : 'No charging' }}</span>
+        </div>
+        <span class="text-base-content/15">·</span>
+        <span class="font-semibold text-base-content/50">{{ selectedSpot.generalPrice }}</span>
+      </div>
+
+      <div class="w-12 h-px bg-base-content/10 mt-8 mb-7"></div>
+
+      @if (selectedSpot.drinkOrder) {
+        <div class="flex items-start gap-2.5">
+          <ng-icon name="lucideCoffee" size="16" class="text-primary/50 mt-0.5 shrink-0"></ng-icon>
+          <p class="italic text-base-content/55 leading-relaxed">"{{ selectedSpot.drinkOrder }}"</p>
+        </div>
+      }
+
+      @if (selectedSpot.extraNotes) {
+        <div class="mt-5 px-5 py-4 rounded-xl bg-base-200/60 text-sm text-base-content/50 leading-relaxed">
+          {{ selectedSpot.extraNotes }}
+        </div>
+      }
+    } @else {
+      <div class="flex flex-col items-center justify-center h-full text-base-content/25">
+        <p class="font-display text-2xl">Pick a spot</p>
+        <p class="text-sm mt-1.5">Select from your collection to see details</p>
+      </div>
     }
-    </div>
+  </div>
 </div>

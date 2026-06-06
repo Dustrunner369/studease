@@ -1,54 +1,116 @@
-    <div class="w-full max-w-md h-full max-h-lvh rounded-md content-center bg-blue-300" (click)="closeModal()">        
-        <hr class="my-5 border-dashed"/>
-        <div class="modal-content" (click)="$event.stopPropagation()">
-            <form #f="ngForm" (ngSubmit)="onSubmit(f)" novalidate>
-                <label for="name">Name: </label>
-                <input ngModel type="text" id="name" name="name" class="bg-white-100">
-                <br>
+<div class="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4"
+     (click)="closeModal()">
+  <div class="fixed inset-0 bg-base-content/15 backdrop-blur-sm animate-fade-in"></div>
 
-                <label for="address">Address: </label>
-                <input ngModel type="text" id="address" name="address" class="bg-white-100">
-                <br>
+  <div class="relative z-10 bg-base-100 rounded-t-3xl sm:rounded-3xl w-full max-w-lg max-h-[85vh] overflow-y-auto shadow-xl animate-slide-up"
+       (click)="$event.stopPropagation()">
+    <div class="p-8">
+      <div class="flex items-center justify-between mb-8">
+        <h2 class="font-display text-2xl font-semibold text-base-content">Log a new spot</h2>
+        <button (click)="closeModal()" class="btn btn-ghost btn-sm btn-circle">
+          <ng-icon name="lucideX" size="18"></ng-icon>
+        </button>
+      </div>
 
-                <label for="power">Charging Outlets?</label>
-                <input ngModel type="checkbox" id="power" name="power" value="Power" class="w-5 h-4  ml-1">
-                <br>
-
-                <label for="seating">Amount of Seating (0-10)</label><br>
-                <input ngModel type="range" id="seating" name="seating" value="0" min="0" max="10" class="border-hidden">
-                <br>
-
-                <label for="coffeeQuality">Coffee Quality (0-10)</label><br>
-                <input ngModel type="range" id="coffeeQuality" name="coffeeQuality" value="0" min="0" max="10" class="border-hidden">
-                <br>
-
-                <label for="affordable">Affordable</label>
-                <input ngModel type="radio" id="affordable" name="generalPrice" class="border-2 rounded-md w-10">
-                <br>
-                <label for="cheap">Cheap</label>
-                <input ngModel type="radio" id="cheap" name="generalPrice" class="border-2 rounded-md w-10">
-                <br>
-                <label for="expensive">Expensive</label>
-                <input ngModel type="radio" id="expensive" name="generalPrice" class="border-2 rounded-md w-10">
-                <br>
-                <label for="insane">Break the bank</label>
-                <input ngModel type="radio" id="insane" name="generalPrice" class="border-2 rounded-md w-10">
-                <br>
-
-                <label for="openUntil">How late do they stay open?</label>
-                <input ngModel type="time" id="openUntil" name="openUntil" step="360" class="border-2 rounded-md">
-
-                <br>
-                <label for="drinkOrder">Drink Order</label>
-                <input ngModel type="text" id="drinkOrder" name="drinkOrder" class="border-2 rounded-md">
-
-                <br>
-                <label for="notes">Extra Notes:</label>
-                <textarea ngModel id="notes" name="notes" placeholder="Describe the vibe" class="w-3/4 block p-2.5 text-sm border-2 rounded-md placeholder:opacity-40"></textarea> -->
-                
-                <button (click)="closeModal()">Cancel</button>
-                <button type="submit">Create Spot</button>                
-            </form>
+      <form #f="ngForm" (ngSubmit)="onSubmit(f)" novalidate class="space-y-6">
+        <div class="space-y-4">
+          <div>
+            <label for="name" class="text-xs text-base-content/40 uppercase tracking-wider">Name</label>
+            <input ngModel type="text" id="name" name="name" placeholder="What's the place called?"
+                   class="input input-bordered w-full mt-1.5 rounded-xl">
+          </div>
+          <div>
+            <label for="address" class="text-xs text-base-content/40 uppercase tracking-wider">Address</label>
+            <input ngModel type="text" id="address" name="address" placeholder="Where is it?"
+                   class="input input-bordered w-full mt-1.5 rounded-xl">
+          </div>
         </div>
-    </div>
 
+        <div class="space-y-4">
+          <div class="text-xs text-base-content/25 uppercase tracking-widest font-semibold">Details</div>
+
+          <div class="flex items-center justify-between">
+            <label for="power" class="text-sm text-base-content/70">Charging outlets?</label>
+            <input ngModel type="checkbox" id="power" name="power" class="toggle toggle-primary toggle-sm">
+          </div>
+
+          <div>
+            <div class="flex items-center justify-between mb-1.5">
+              <label for="seating" class="text-sm text-base-content/70">Seating</label>
+              <span class="text-xs text-base-content/30 tabular-nums">0 - 10</span>
+            </div>
+            <input ngModel type="range" id="seating" name="seating" value="5" min="0" max="10"
+                   class="range range-primary range-xs">
+          </div>
+
+          <div>
+            <div class="flex items-center justify-between mb-1.5">
+              <label for="coffeeQuality" class="text-sm text-base-content/70">Coffee quality</label>
+              <span class="text-xs text-base-content/30 tabular-nums">0 - 10</span>
+            </div>
+            <input ngModel type="range" id="coffeeQuality" name="coffeeQuality" value="5" min="0" max="10"
+                   class="range range-primary range-xs">
+          </div>
+
+          <div>
+            <label class="text-sm text-base-content/70 block mb-2">Price range</label>
+            <div class="flex gap-2">
+              <label class="flex-1">
+                <input ngModel type="radio" name="generalPrice" value="$" class="hidden peer">
+                <div class="text-center py-2 rounded-xl border border-base-300 cursor-pointer text-sm
+                            peer-checked:bg-primary peer-checked:text-primary-content peer-checked:border-primary
+                            hover:bg-base-200 transition-colors">$</div>
+              </label>
+              <label class="flex-1">
+                <input ngModel type="radio" name="generalPrice" value="$$" class="hidden peer">
+                <div class="text-center py-2 rounded-xl border border-base-300 cursor-pointer text-sm
+                            peer-checked:bg-primary peer-checked:text-primary-content peer-checked:border-primary
+                            hover:bg-base-200 transition-colors">$$</div>
+              </label>
+              <label class="flex-1">
+                <input ngModel type="radio" name="generalPrice" value="$$$" class="hidden peer">
+                <div class="text-center py-2 rounded-xl border border-base-300 cursor-pointer text-sm
+                            peer-checked:bg-primary peer-checked:text-primary-content peer-checked:border-primary
+                            hover:bg-base-200 transition-colors">$$$</div>
+              </label>
+              <label class="flex-1">
+                <input ngModel type="radio" name="generalPrice" value="$$$$" class="hidden peer">
+                <div class="text-center py-2 rounded-xl border border-base-300 cursor-pointer text-sm
+                            peer-checked:bg-primary peer-checked:text-primary-content peer-checked:border-primary
+                            hover:bg-base-200 transition-colors">$$$$</div>
+              </label>
+            </div>
+          </div>
+
+          <div>
+            <label for="openUntil" class="text-xs text-base-content/40 uppercase tracking-wider">Open until</label>
+            <input ngModel type="time" id="openUntil" name="openUntil"
+                   class="input input-bordered w-full mt-1.5 rounded-xl">
+          </div>
+        </div>
+
+        <div class="space-y-4">
+          <div class="text-xs text-base-content/25 uppercase tracking-widest font-semibold">Personal</div>
+
+          <div>
+            <label for="drinkOrder" class="text-xs text-base-content/40 uppercase tracking-wider">Drink order</label>
+            <input ngModel type="text" id="drinkOrder" name="drinkOrder" placeholder="Your go-to order"
+                   class="input input-bordered w-full mt-1.5 rounded-xl">
+          </div>
+
+          <div>
+            <label for="notes" class="text-xs text-base-content/40 uppercase tracking-wider">Extra notes</label>
+            <textarea ngModel id="notes" name="notes" placeholder="Describe the vibe..."
+                      rows="3"
+                      class="textarea textarea-bordered w-full mt-1.5 rounded-xl min-h-20"></textarea>
+          </div>
+        </div>
+
+        <div class="flex gap-3 pt-2">
+          <button type="button" (click)="closeModal()" class="btn btn-ghost flex-1 rounded-xl">Cancel</button>
+          <button type="submit" class="btn btn-primary flex-1 rounded-xl">Save spot</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>

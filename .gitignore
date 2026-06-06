@@ -29,3 +29,5 @@ Thumbs.db
 
 # Postgres data
 pgdata/
+
+.impeccable.md
