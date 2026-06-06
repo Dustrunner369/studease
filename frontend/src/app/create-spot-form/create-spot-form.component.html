@@ -1,7 +1,6 @@
-    <div class="w-full max-w-md h-full max-h-lvh rounded-md content-center bg-blue-300 ">
-        
+    <div class="w-full max-w-md h-full max-h-lvh rounded-md content-center bg-blue-300" (click)="closeModal()">        
         <hr class="my-5 border-dashed"/>
-        <div>
+        <div class="modal-content" (click)="$event.stopPropagation()">
             <form #f="ngForm" (ngSubmit)="onSubmit(f)" novalidate>
                 <label for="name">Name: </label>
                 <input ngModel type="text" id="name" name="name" class="bg-white-100">
@@ -47,7 +46,8 @@
                 <label for="notes">Extra Notes:</label>
                 <textarea ngModel id="notes" name="notes" placeholder="Describe the vibe" class="w-3/4 block p-2.5 text-sm border-2 rounded-md placeholder:opacity-40"></textarea> -->
                 
-                <button type="submit">Create Spot</button>
+                <button (click)="closeModal()">Cancel</button>
+                <button type="submit">Create Spot</button>                
             </form>
         </div>
     </div>

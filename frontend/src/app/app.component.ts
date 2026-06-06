@@ -6,7 +6,7 @@ import { StudySpot } from '../services/study-spot.service';
 
 @Component({  
   selector: 'app-root',
-  imports: [RouterOutlet, SpotCardComponent, SpotListComponent ],
+  imports: [RouterOutlet, SpotCardComponent, SpotListComponent],
   templateUrl: './app.component.html',  
 })
 export class AppComponent {
