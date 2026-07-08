@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations.Schema;
+
 namespace study_spot_backend;
 
 public class StudySpot
@@ -9,6 +11,7 @@ public class StudySpot
     public int Seating { get; set; }
     public int CoffeeQuality { get; set; }
     public string? GeneralPrice { get; set; }
+    [Column(TypeName = "timestamp without time zone")]
     public DateTime OpenUntil { get; set; }
     public string? DrinkOrder { get; set; }
     public string? ExtraNotes { get; set; }

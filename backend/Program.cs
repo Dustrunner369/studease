@@ -49,31 +49,40 @@ app.MapPost("/studyspots", async (StudySpot studySpot, AppDbContext db) =>
     return Results.Created($"/studyspots/{studySpot.Id}", studySpot);
 });
 
-// app.MapPut("/todoitems/{id}", async (int id, Todo inputTodo, AppDbContext db) =>
-// {
-//     var todo = await db.StudySpots.FindAsync(id);
-//
-//     if (todo is null) return Results.NotFound();
-//
-//     todo.Name = inputTodo.Name;
-//     //todo.IsComplete = inputTodo.IsComplete;
-//
-//     await db.SaveChangesAsync();
-//
-//     return Results.NoContent();
-// });
+// Modifies an existing study spot
+app.MapPut("/studyspots/{id}", async (int id, StudySpot spotToCreate, AppDbContext db) =>
+{
+    StudySpot? studySpot = await db.StudySpots.FindAsync(id);
 
-// app.MapDelete("/todoitems/{id}", async (int id, AppDbContext db) =>
-// {
-//     if (await db.StudySpots.FindAsync(id) is Todo todo)
-//     {
-//         db.StudySpots.Remove(todo);
-//         await db.SaveChangesAsync();
-//         return Results.NoContent();
-//     }
-//
-//     return Results.NotFound();
-// });
+    if (studySpot is null) return Results.NotFound();
+
+    studySpot.Name = spotToCreate.Name;
+    studySpot.Address = spotToCreate.Address;
+    studySpot.HasCharging = spotToCreate.HasCharging;
+    studySpot.Seating = spotToCreate.Seating;
+    studySpot.CoffeeQuality = spotToCreate.CoffeeQuality;
+    studySpot.GeneralPrice = spotToCreate.GeneralPrice;
+    studySpot.OpenUntil = spotToCreate.OpenUntil;
+    studySpot.DrinkOrder = spotToCreate.DrinkOrder;
+    studySpot.ExtraNotes = spotToCreate.ExtraNotes;
+
+    await db.SaveChangesAsync();
+
+    return Results.NoContent();
+});
+
+// Deletes
+app.MapDelete("/studyspots/{id}", async (int id, AppDbContext db) =>
+{
+    if (await db.StudySpots.FindAsync(id) is StudySpot studySpot)
+    {
+        db.StudySpots.Remove(studySpot);
+        await db.SaveChangesAsync();
+        return Results.NoContent();
+    }
+
+    return Results.NotFound();
+});
 
 app.UseCors();
 
