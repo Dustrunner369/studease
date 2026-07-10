@@ -1,67 +1,81 @@
-// STUDY SPOTS — neubrutalist "Spots" page
+// STUDY SPOTS — concept 3: "clean ranked" (Beli-inspired)
+// simple + modern: white space, ranked rows, colored score bubbles,
+// pastel category illustrations, thin lines and small colorful accents
 //
 // Setup:
-//   1. In pubspec.yaml, add:
-//        dependencies:
-//          google_fonts: ^6.2.1
-//   2. flutter pub get
-//   3. Replace lib/main.dart with this file and run.
-//      (google_fonts downloads Archivo Black + Space Grotesk on first
-//       launch, so the device/emulator needs internet once.)
+//   1. pubspec.yaml needs google_fonts (you already have it).
+//   2. Save as lib/main_clean.dart and run with:
+//        flutter run -t lib/main_clean.dart
+//      (or paste over lib/main.dart)
+
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 void main() {
-  runApp(const StudySpotsApp());
+  runApp(const StudySpotsCleanApp());
 }
 
 // ---------------------------------------------------------------------------
 // Design tokens
 // ---------------------------------------------------------------------------
 
-abstract final class Neo {
-  static const ink = Color(0xFF17151F); // borders, text, shadows
-  static const paper = Color(0xFFE7E1F5); // lavender background
-  static const card = Color(0xFFFFFCF4); // warm white cards
-  static const yellow = Color(0xFFFFD230); // primary accent
-  static const coral = Color(0xFFFF7A5C); // "top spot" tape
-  static const muted = Color(0xFF8A85A0); // secondary text
+abstract final class Tone {
+  static const bg = Color(0xFFFFFFFF);
+  static const ink = Color(0xFF101828); // near-black text
+  static const muted = Color(0xFF667085); // secondary text
+  static const line = Color(0xFFEAECF0); // hairline dividers
+  static const field = Color(0xFFF2F4F7); // search field / chips
+
+  // accent trio — used for small lines and illustration strokes
+  static const teal = Color(0xFF0BA574);
+  static const amber = Color(0xFFF5A623);
+  static const coral = Color(0xFFF4633A);
 }
 
-/// How good an amenity is. The color IS the rating.
+/// Beli-style score banding: the bubble color tells you the tier.
+Color scoreColor(double s) {
+  if (s >= 9.0) return const Color(0xFF0BA574); // emerald
+  if (s >= 8.0) return const Color(0xFF7CB342); // green
+  if (s >= 7.0) return const Color(0xFFF5A623); // amber
+  return const Color(0xFFF4633A); // coral
+}
+
 enum Level {
-  good(Color(0xFF97E06E)),
-  ok(Color(0xFFFFDE59)),
-  rough(Color(0xFFFF9C8C));
+  good(Color(0xFF0BA574), 'Great'),
+  ok(Color(0xFFF5A623), 'Okay'),
+  rough(Color(0xFFF4633A), 'Rough');
 
   final Color color;
-  const Level(this.color);
+  final String display;
+  const Level(this.color, this.display);
 }
 
 enum SpotType {
-  cafe('CAFÉ', Color(0xFFFFC1E0)),
-  library('LIBRARY', Color(0xFFB5D8FF)),
-  campus('CAMPUS', Color(0xFFFFC97A));
+  cafe('Café', Icons.local_cafe, Color(0xFFFFE8D9), Color(0xFFF4633A)),
+  library('Library', Icons.menu_book, Color(0xFFDDF3E8), Color(0xFF0BA574)),
+  campus('Campus', Icons.school, Color(0xFFECE8FD), Color(0xFF7A5AF8));
 
   final String label;
-  final Color color;
-  const SpotType(this.label, this.color);
+  final IconData icon;
+  final Color pastel; // circle background
+  final Color accent; // icon color
+  const SpotType(this.label, this.icon, this.pastel, this.accent);
 }
 
 // ---------------------------------------------------------------------------
-// Model + sample data
+// Model + sample data (same shape as concepts 1 & 2)
 // ---------------------------------------------------------------------------
 
 class StudySpot {
   final String name;
   final SpotType type;
-  final double score; // Beli-style 0–10
+  final double score;
   final String distance;
   final String hours;
   final Level wifi;
   final Level seating;
-  final Level noise; // green = quiet enough to focus
+  final Level noise;
   final Level coffee;
   final Level outlets;
 
@@ -93,8 +107,8 @@ const _sampleSpots = <StudySpot>[
     name: "Lestat's Coffee House",
     type: SpotType.cafe,
     score: 9.4,
-    distance: '4.6 MI',
-    hours: 'OPEN 24 HRS',
+    distance: '4.6 mi',
+    hours: 'Open 24 hrs',
     wifi: Level.good,
     seating: Level.good,
     noise: Level.ok,
@@ -105,8 +119,8 @@ const _sampleSpots = <StudySpot>[
     name: 'Ryan Library',
     type: SpotType.library,
     score: 9.1,
-    distance: '0.2 MI',
-    hours: 'TIL 11 PM',
+    distance: '0.2 mi',
+    hours: 'Til 11 pm',
     wifi: Level.good,
     seating: Level.good,
     noise: Level.good,
@@ -117,8 +131,8 @@ const _sampleSpots = <StudySpot>[
     name: 'Fermanian Lounge',
     type: SpotType.campus,
     score: 8.6,
-    distance: '0.1 MI',
-    hours: 'TIL 10 PM',
+    distance: '0.1 mi',
+    hours: 'Til 10 pm',
     wifi: Level.good,
     seating: Level.ok,
     noise: Level.good,
@@ -129,8 +143,8 @@ const _sampleSpots = <StudySpot>[
     name: 'Communal Coffee',
     type: SpotType.cafe,
     score: 8.4,
-    distance: '5.1 MI',
-    hours: 'TIL 5 PM',
+    distance: '5.1 mi',
+    hours: 'Til 5 pm',
     wifi: Level.ok,
     seating: Level.ok,
     noise: Level.ok,
@@ -141,8 +155,8 @@ const _sampleSpots = <StudySpot>[
     name: 'Moniker General',
     type: SpotType.cafe,
     score: 8.0,
-    distance: '3.4 MI',
-    hours: 'TIL 9 PM',
+    distance: '3.4 mi',
+    hours: 'Til 9 pm',
     wifi: Level.good,
     seating: Level.good,
     noise: Level.rough,
@@ -153,8 +167,8 @@ const _sampleSpots = <StudySpot>[
     name: 'Hervey Branch Library',
     type: SpotType.library,
     score: 7.9,
-    distance: '1.2 MI',
-    hours: 'TIL 6 PM',
+    distance: '1.2 mi',
+    hours: 'Til 6 pm',
     wifi: Level.ok,
     seating: Level.good,
     noise: Level.good,
@@ -165,8 +179,8 @@ const _sampleSpots = <StudySpot>[
     name: 'Better Buzz Point Loma',
     type: SpotType.cafe,
     score: 7.6,
-    distance: '1.8 MI',
-    hours: 'TIL 7 PM',
+    distance: '1.8 mi',
+    hours: 'Til 7 pm',
     wifi: Level.ok,
     seating: Level.rough,
     noise: Level.rough,
@@ -179,8 +193,8 @@ const _sampleSpots = <StudySpot>[
 // App
 // ---------------------------------------------------------------------------
 
-class StudySpotsApp extends StatelessWidget {
-  const StudySpotsApp({super.key});
+class StudySpotsCleanApp extends StatelessWidget {
+  const StudySpotsCleanApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -189,9 +203,11 @@ class StudySpotsApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,
-        scaffoldBackgroundColor: Neo.paper,
-        colorScheme: ColorScheme.fromSeed(seedColor: Neo.yellow),
-        textTheme: GoogleFonts.spaceGroteskTextTheme(),
+        scaffoldBackgroundColor: Tone.bg,
+        colorScheme: ColorScheme.fromSeed(seedColor: Tone.teal),
+        textTheme: GoogleFonts.plusJakartaSansTextTheme(),
+        splashColor: Tone.field,
+        highlightColor: Tone.field,
       ),
       home: const SpotsPage(),
     );
@@ -210,7 +226,7 @@ class SpotsPage extends StatefulWidget {
 }
 
 class _SpotsPageState extends State<SpotsPage> {
-  SpotType? _filter; // null = all
+  SpotType? _filter;
 
   List<StudySpot> get _visibleSpots {
     final spots =
@@ -219,21 +235,18 @@ class _SpotsPageState extends State<SpotsPage> {
     return spots;
   }
 
-  void _notYet(String message) {
+  void _soon(String message) {
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         behavior: SnackBarBehavior.floating,
-        backgroundColor: Neo.yellow,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-          side: const BorderSide(color: Neo.ink, width: 2.5),
-        ),
+        backgroundColor: Tone.ink,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         content: Text(
           message,
-          style: GoogleFonts.spaceGrotesk(
-            color: Neo.ink,
-            fontWeight: FontWeight.w700,
+          style: GoogleFonts.plusJakartaSans(
+            color: Colors.white,
+            fontWeight: FontWeight.w600,
           ),
         ),
       ),
@@ -246,35 +259,41 @@ class _SpotsPageState extends State<SpotsPage> {
 
     return Scaffold(
       body: SafeArea(
-        bottom: false,
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 120),
+          padding: const EdgeInsets.only(bottom: 110),
           children: [
-            _buildHeader(),
-            const SizedBox(height: 20),
-            _buildFilters(),
-            const SizedBox(height: 10),
-            _buildLegend(),
-            const SizedBox(height: 18),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildHeader(),
+                  const SizedBox(height: 16),
+                  _buildSearchBar(),
+                  const SizedBox(height: 14),
+                  _buildFilters(),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Divider(height: 1, thickness: 1, color: Tone.line),
             for (var i = 0; i < spots.length; i++) ...[
-              SpotCard(spot: spots[i], index: i, isTop: _filter == null && i == 0),
-              const SizedBox(height: 20),
+              SpotRow(rank: i + 1, spot: spots[i]),
+              const Padding(
+                padding: EdgeInsets.only(left: 20),
+                child: Divider(height: 1, thickness: 1, color: Tone.line),
+              ),
             ],
           ],
         ),
       ),
-      floatingActionButton: NeoPressable(
-        color: Neo.yellow,
-        borderRadius: 16,
-        shadowOffset: const Offset(4, 4),
-        onTap: () => _notYet('Add a spot — coming soon'),
-        child: const SizedBox(
-          width: 58,
-          height: 58,
-          child: Icon(Icons.add, size: 30, color: Neo.ink),
-        ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => _soon('Add a spot — coming soon'),
+        backgroundColor: Tone.ink,
+        shape: const CircleBorder(),
+        child: const Icon(Icons.add, color: Colors.white),
       ),
-      bottomNavigationBar: const NeoBottomNav(),
+      bottomNavigationBar: const CleanBottomNav(),
     );
   }
 
@@ -287,44 +306,77 @@ class _SpotsPageState extends State<SpotsPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                '${_sampleSpots.length} SPOTS SAVED',
-                style: GoogleFonts.spaceGrotesk(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 1.5,
-                  color: Neo.muted,
+                'Spots',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 30,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.5,
+                  color: Tone.ink,
                 ),
               ),
-              const SizedBox(height: 2),
+              const SizedBox(height: 6),
+              // small tri-color accent line
+              Row(
+                children: [
+                  for (final c in const [Tone.teal, Tone.amber, Tone.coral])
+                    Container(
+                      width: 16,
+                      height: 3,
+                      margin: const EdgeInsets.only(right: 4),
+                      decoration: BoxDecoration(
+                        color: c,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 10),
               Text(
-                'STUDY SPOTS',
-                style: GoogleFonts.archivoBlack(
-                  fontSize: 30,
-                  color: Neo.ink,
-                  height: 1.05,
+                '${_sampleSpots.length} spots · Point Loma',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: Tone.muted,
                 ),
               ),
             ],
-          ),
-        ),
-        NeoPressable(
-          borderRadius: 12,
-          borderWidth: 2.5,
-          shadowOffset: const Offset(3, 3),
-          onTap: () => _notYet('Search — coming soon'),
-          child: const SizedBox(
-            width: 46,
-            height: 46,
-            child: Icon(Icons.search, color: Neo.ink),
           ),
         ),
       ],
     );
   }
 
+  Widget _buildSearchBar() {
+    return InkWell(
+      onTap: () => _soon('Search — coming soon'),
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: Tone.field,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.search, size: 20, color: Tone.muted),
+            const SizedBox(width: 8),
+            Text(
+              'Search your spots',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: Tone.muted,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildFilters() {
     final options = <(String, SpotType?)>[
-      ('ALL', null),
+      ('All', null),
       for (final t in SpotType.values) (t.label, t),
     ];
 
@@ -334,269 +386,366 @@ class _SpotsPageState extends State<SpotsPage> {
       child: Row(
         children: [
           for (final (label, type) in options) ...[
-            NeoPressable(
-              color: _filter == type ? Neo.yellow : Neo.card,
-              borderRadius: 30,
-              borderWidth: 2.5,
-              shadowOffset: const Offset(3, 3),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            InkWell(
               onTap: () => setState(() => _filter = type),
-              child: Text(
-                label,
-                style: GoogleFonts.spaceGrotesk(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.5,
-                  color: Neo.ink,
+              borderRadius: BorderRadius.circular(20),
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  color: _filter == type ? Tone.ink : Tone.field,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  label,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: _filter == type ? Colors.white : Tone.ink,
+                  ),
                 ),
               ),
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 8),
           ],
         ],
       ),
     );
   }
-
-  Widget _buildLegend() {
-    Widget swatch(Level level, String label) => Row(
-          children: [
-            Container(
-              width: 11,
-              height: 11,
-              decoration: BoxDecoration(
-                color: level.color,
-                border: Border.all(color: Neo.ink, width: 1.5),
-                borderRadius: BorderRadius.circular(3),
-              ),
-            ),
-            const SizedBox(width: 4),
-            Text(
-              label,
-              style: GoogleFonts.spaceGrotesk(
-                fontSize: 10,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.5,
-                color: Neo.muted,
-              ),
-            ),
-          ],
-        );
-
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.end,
-      children: [
-        swatch(Level.good, 'GOOD'),
-        const SizedBox(width: 10),
-        swatch(Level.ok, 'OK'),
-        const SizedBox(width: 10),
-        swatch(Level.rough, 'ROUGH'),
-      ],
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------
-// Spot card
+// Ranked row
 // ---------------------------------------------------------------------------
 
-class SpotCard extends StatelessWidget {
+class SpotRow extends StatelessWidget {
+  final int rank;
   final StudySpot spot;
-  final int index;
-  final bool isTop;
 
-  const SpotCard({
-    super.key,
-    required this.spot,
-    required this.index,
-    required this.isTop,
-  });
-
-  void _showDetail(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (_) => SpotDetailSheet(spot: spot),
-    );
-  }
+  const SpotRow({super.key, required this.rank, required this.spot});
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        NeoPressable(
-          padding: const EdgeInsets.all(14),
-          onTap: () => _showDetail(context),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              ScoreBadge(score: spot.score, index: index),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      spot.name,
-                      style: GoogleFonts.spaceGrotesk(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w700,
-                        color: Neo.ink,
-                        height: 1.1,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Row(
-                      children: [
-                        TypeTag(type: spot.type),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            '${spot.distance} • ${spot.hours}',
-                            overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.spaceGrotesk(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              letterSpacing: 0.5,
-                              color: Neo.muted,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        for (final (icon, label, level) in spot.amenities)
-                          AmenityTile(icon: icon, label: label, level: level),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-        if (isTop)
-          Positioned(
-            top: -10,
-            right: 14,
-            child: Transform.rotate(
-              angle: 0.05,
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Neo.coral,
-                  border: Border.all(color: Neo.ink, width: 2),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  '★ TOP SPOT',
-                  style: GoogleFonts.spaceGrotesk(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 1,
-                    color: Neo.ink,
-                  ),
+    return InkWell(
+      onTap: () => showModalBottomSheet(
+        context: context,
+        backgroundColor: Colors.transparent,
+        isScrollControlled: true,
+        builder: (_) => SpotDetailSheet(spot: spot),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 22,
+              child: Text(
+                '$rank',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: Tone.muted,
                 ),
               ),
             ),
-          ),
-      ],
-    );
-  }
-}
-
-class ScoreBadge extends StatelessWidget {
-  final double score;
-  final int index;
-
-  const ScoreBadge({super.key, required this.score, required this.index});
-
-  @override
-  Widget build(BuildContext context) {
-    // Alternate the sticker tilt down the list.
-    final angle = index.isEven ? -0.09 : 0.07;
-
-    return Transform.rotate(
-      angle: angle,
-      child: Container(
-        width: 54,
-        height: 54,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: Neo.yellow,
-          border: Border.all(color: Neo.ink, width: 3),
-          borderRadius: BorderRadius.circular(14),
-          boxShadow: const [BoxShadow(color: Neo.ink, offset: Offset(3, 3))],
-        ),
-        child: Text(
-          score.toStringAsFixed(1),
-          style: GoogleFonts.archivoBlack(fontSize: 16, color: Neo.ink),
+            _CategoryCircle(type: spot.type),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    spot.name,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 15.5,
+                      fontWeight: FontWeight.w700,
+                      color: Tone.ink,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '${spot.distance} · ${spot.hours}',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w500,
+                      color: Tone.muted,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      for (final (icon, label, level) in spot.amenities) ...[
+                        Tooltip(
+                          message: '$label: ${level.display}',
+                          child: Icon(icon, size: 14, color: level.color),
+                        ),
+                        const SizedBox(width: 8),
+                      ],
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            _ScoreBubble(score: spot.score),
+          ],
         ),
       ),
     );
   }
 }
 
-class TypeTag extends StatelessWidget {
+class _CategoryCircle extends StatelessWidget {
   final SpotType type;
 
-  const TypeTag({super.key, required this.type});
+  const _CategoryCircle({required this.type});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      width: 44,
+      height: 44,
+      decoration: BoxDecoration(color: type.pastel, shape: BoxShape.circle),
+      child: Icon(type.icon, size: 20, color: type.accent),
+    );
+  }
+}
+
+class _ScoreBubble extends StatelessWidget {
+  final double score;
+
+  const _ScoreBubble({required this.score});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 42,
+      height: 42,
+      alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: type.color,
-        border: Border.all(color: Neo.ink, width: 2),
-        borderRadius: BorderRadius.circular(6),
+        color: scoreColor(score),
+        shape: BoxShape.circle,
       ),
       child: Text(
-        type.label,
-        style: GoogleFonts.spaceGrotesk(
-          fontSize: 10,
+        score.toStringAsFixed(1),
+        style: GoogleFonts.plusJakartaSans(
+          fontSize: 13.5,
           fontWeight: FontWeight.w800,
-          letterSpacing: 0.8,
-          color: Neo.ink,
+          color: Colors.white,
         ),
       ),
     );
   }
 }
 
-class AmenityTile extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Level level;
+// ---------------------------------------------------------------------------
+// Spot detail bottom sheet
+// ---------------------------------------------------------------------------
 
-  const AmenityTile({
-    super.key,
-    required this.icon,
+class SpotDetailSheet extends StatelessWidget {
+  final StudySpot spot;
+
+  const SpotDetailSheet({super.key, required this.spot});
+
+  void _soon(BuildContext context, String message) {
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: Tone.ink,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        content: Text(
+          message,
+          style: GoogleFonts.plusJakartaSans(
+            color: Colors.white,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Tone.bg,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(22, 12, 22, 22),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Tone.line,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  _CategoryCircle(type: spot.type),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          spot.name,
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 19,
+                            fontWeight: FontWeight.w800,
+                            color: Tone.ink,
+                            height: 1.15,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '${spot.type.label} · ${spot.distance} · ${spot.hours}',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w500,
+                            color: Tone.muted,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  _ScoreBubble(score: spot.score),
+                ],
+              ),
+              const SizedBox(height: 20),
+              const Divider(height: 1, thickness: 1, color: Tone.line),
+              const SizedBox(height: 16),
+              Text(
+                'THE RUNDOWN',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 1.2,
+                  color: Tone.muted,
+                ),
+              ),
+              const SizedBox(height: 6),
+              for (final (icon, label, level) in spot.amenities)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Row(
+                    children: [
+                      Icon(icon, size: 19, color: Tone.muted),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          label,
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 14.5,
+                            fontWeight: FontWeight.w600,
+                            color: Tone.ink,
+                          ),
+                        ),
+                      ),
+                      Container(
+                        width: 8,
+                        height: 8,
+                        margin: const EdgeInsets.only(right: 8),
+                        decoration: BoxDecoration(
+                          color: level.color,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      Text(
+                        level.display,
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w700,
+                          color: level.color,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              const SizedBox(height: 18),
+              Row(
+                children: [
+                  Expanded(
+                    child: _SheetButton(
+                      label: 'Directions',
+                      icon: Icons.near_me,
+                      filled: true,
+                      onTap: () => _soon(context, 'Directions — coming soon'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _SheetButton(
+                      label: 'Edit spot',
+                      icon: Icons.edit_outlined,
+                      filled: false,
+                      onTap: () => _soon(context, 'Edit spot — coming soon'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SheetButton extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final bool filled;
+  final VoidCallback onTap;
+
+  const _SheetButton({
     required this.label,
-    required this.level,
+    required this.icon,
+    required this.filled,
+    required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Tooltip(
-      message: '$label: ${level.name.toUpperCase()}',
+    final fg = filled ? Colors.white : Tone.ink;
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
       child: Container(
-        width: 34,
-        height: 34,
-        alignment: Alignment.center,
+        padding: const EdgeInsets.symmetric(vertical: 13),
         decoration: BoxDecoration(
-          color: level.color,
-          border: Border.all(color: Neo.ink, width: 2),
-          borderRadius: BorderRadius.circular(9),
+          color: filled ? Tone.ink : Tone.bg,
+          borderRadius: BorderRadius.circular(14),
+          border: filled ? null : Border.all(color: Tone.line, width: 1.5),
         ),
-        child: Icon(icon, size: 18, color: Neo.ink),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 18, color: fg),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: fg,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -606,26 +755,27 @@ class AmenityTile extends StatelessWidget {
 // Bottom nav
 // ---------------------------------------------------------------------------
 
-class NeoBottomNav extends StatelessWidget {
-  const NeoBottomNav({super.key});
+class CleanBottomNav extends StatelessWidget {
+  const CleanBottomNav({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Container(
       decoration: const BoxDecoration(
-        color: Neo.card,
-        border: Border(top: BorderSide(color: Neo.ink, width: 3)),
+        color: Tone.bg,
+        border: Border(top: BorderSide(color: Tone.line, width: 1)),
       ),
       child: SafeArea(
         top: false,
         child: SizedBox(
-          height: 64,
+          height: 60,
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: const [
-              _NavItem(icon: Icons.place, label: 'SPOTS', active: true),
-              _NavItem(icon: Icons.map, label: 'MAP', active: false),
-              _NavItem(icon: Icons.person, label: 'ME', active: false),
+              _NavItem(icon: Icons.place, label: 'Spots', active: true),
+              _NavItem(icon: Icons.map_outlined, label: 'Map', active: false),
+              _NavItem(
+                  icon: Icons.person_outline, label: 'Profile', active: false),
             ],
           ),
         ),
@@ -639,340 +789,30 @@ class _NavItem extends StatelessWidget {
   final String label;
   final bool active;
 
-  const _NavItem({required this.icon, required this.label, required this.active});
+  const _NavItem({
+    required this.icon, 
+    required this.label, 
+    required this.active
+  });
 
   @override
   Widget build(BuildContext context) {
-    final color = active ? Neo.ink : Neo.muted;
+    final color = active ? Tone.ink : const Color(0xFF98A2B3);
 
-    final content = Row(
-      mainAxisSize: MainAxisSize.min,
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Icon(icon, size: 20, color: color),
-        const SizedBox(width: 6),
+        Icon(icon, size: 22, color: color),
+        const SizedBox(height: 2),
         Text(
           label,
-          style: GoogleFonts.spaceGrotesk(
+          style: GoogleFonts.plusJakartaSans(
             fontSize: 11,
-            fontWeight: FontWeight.w800,
-            letterSpacing: 0.8,
+            fontWeight: active ? FontWeight.w700 : FontWeight.w500,
             color: color,
           ),
         ),
       ],
-    );
-
-    if (!active) return content;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-      decoration: BoxDecoration(
-        color: Neo.yellow,
-        border: Border.all(color: Neo.ink, width: 2.5),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: content,
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// NeoPressable — bordered container with a hard shadow that collapses on press
-// ---------------------------------------------------------------------------
-
-class NeoPressable extends StatefulWidget {
-  final Widget child;
-  final VoidCallback? onTap;
-  final Color color;
-  final double borderRadius;
-  final double borderWidth;
-  final Offset shadowOffset;
-  final EdgeInsets padding;
-
-  const NeoPressable({
-    super.key,
-    required this.child,
-    this.onTap,
-    this.color = Neo.card,
-    this.borderRadius = 16,
-    this.borderWidth = 3,
-    this.shadowOffset = const Offset(5, 5),
-    this.padding = EdgeInsets.zero,
-  });
-
-  @override
-  State<NeoPressable> createState() => _NeoPressableState();
-}
-
-class _NeoPressableState extends State<NeoPressable> {
-  bool _down = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTapDown: (_) => setState(() => _down = true),
-      onTapUp: (_) => setState(() => _down = false),
-      onTapCancel: () => setState(() => _down = false),
-      onTap: widget.onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 90),
-        curve: Curves.easeOut,
-        transform: Matrix4.translationValues(
-          _down ? widget.shadowOffset.dx : 0,
-          _down ? widget.shadowOffset.dy : 0,
-          0,
-        ),
-        padding: widget.padding,
-        decoration: BoxDecoration(
-          color: widget.color,
-          borderRadius: BorderRadius.circular(widget.borderRadius),
-          border: Border.all(color: Neo.ink, width: widget.borderWidth),
-          boxShadow: _down
-              ? const []
-              : [BoxShadow(color: Neo.ink, offset: widget.shadowOffset)],
-        ),
-        child: widget.child,
-      ),
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Spot detail bottom sheet
-// ---------------------------------------------------------------------------
-
-void showNeoSnack(BuildContext context, String message) {
-  ScaffoldMessenger.of(context).hideCurrentSnackBar();
-  ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(
-      behavior: SnackBarBehavior.floating,
-      backgroundColor: Neo.yellow,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: const BorderSide(color: Neo.ink, width: 2.5),
-      ),
-      content: Text(
-        message,
-        style: GoogleFonts.spaceGrotesk(
-          color: Neo.ink,
-          fontWeight: FontWeight.w700,
-        ),
-      ),
-    ),
-  );
-}
-
-class SpotDetailSheet extends StatelessWidget {
-  final StudySpot spot;
-
-  const SpotDetailSheet({super.key, required this.spot});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Neo.card,
-        border: Border.all(color: Neo.ink, width: 3),
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Drag handle
-              Center(
-                child: Container(
-                  width: 44,
-                  height: 5,
-                  decoration: BoxDecoration(
-                    color: Neo.ink,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 18),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  ScoreBadge(score: spot.score, index: 0),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          spot.name,
-                          style: GoogleFonts.spaceGrotesk(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w700,
-                            color: Neo.ink,
-                            height: 1.1,
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Row(
-                          children: [
-                            TypeTag(type: spot.type),
-                            const SizedBox(width: 8),
-                            Flexible(
-                              child: Text(
-                                '${spot.distance} • ${spot.hours}',
-                                overflow: TextOverflow.ellipsis,
-                                style: GoogleFonts.spaceGrotesk(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                  letterSpacing: 0.5,
-                                  color: Neo.muted,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 22),
-              Text(
-                'THE RUNDOWN',
-                style: GoogleFonts.spaceGrotesk(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 1.5,
-                  color: Neo.muted,
-                ),
-              ),
-              const SizedBox(height: 8),
-              for (final (icon, label, level) in spot.amenities)
-                _AmenityRow(icon: icon, label: label, level: level),
-              const SizedBox(height: 18),
-              Row(
-                children: [
-                  Expanded(
-                    child: _SheetButton(
-                      label: 'DIRECTIONS',
-                      icon: Icons.near_me,
-                      color: Neo.yellow,
-                      onTap: () =>
-                          showNeoSnack(context, 'Directions — coming soon'),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _SheetButton(
-                      label: 'EDIT SPOT',
-                      icon: Icons.edit,
-                      color: Neo.card,
-                      onTap: () =>
-                          showNeoSnack(context, 'Edit spot — coming soon'),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _AmenityRow extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Level level;
-
-  const _AmenityRow({
-    required this.icon,
-    required this.label,
-    required this.level,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        children: [
-          AmenityTile(icon: icon, label: label, level: level),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              label,
-              style: GoogleFonts.spaceGrotesk(
-                fontSize: 15,
-                fontWeight: FontWeight.w700,
-                color: Neo.ink,
-              ),
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: level.color,
-              border: Border.all(color: Neo.ink, width: 2),
-              borderRadius: BorderRadius.circular(30),
-            ),
-            child: Text(
-              level.name.toUpperCase(),
-              style: GoogleFonts.spaceGrotesk(
-                fontSize: 11,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 0.5,
-                color: Neo.ink,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SheetButton extends StatelessWidget {
-  final String label;
-  final IconData icon;
-  final Color color;
-  final VoidCallback onTap;
-
-  const _SheetButton({
-    required this.label,
-    required this.icon,
-    required this.color,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return NeoPressable(
-      color: color,
-      borderRadius: 12,
-      borderWidth: 2.5,
-      shadowOffset: const Offset(3, 3),
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      onTap: onTap,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, size: 18, color: Neo.ink),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: GoogleFonts.spaceGrotesk(
-              fontSize: 13,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 0.5,
-              color: Neo.ink,
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
