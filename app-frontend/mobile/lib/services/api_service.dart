@@ -9,7 +9,11 @@ var response = http.get(url);
 Future<void> main() async {
   try {
     final spots = await fetchStudySpots();
-    print(spots);
+    
+    for (StudySpot s in spots) {
+      print(s);
+    }
+
   } catch (e) {
     print('Error: $e');
   }
@@ -27,7 +31,7 @@ Future<List<StudySpot>> fetchStudySpots() async {
 
   if (response.statusCode == 200) {
     // If the server did return a 200 OK response,
-    // then parse the JSON.
+    // then parse the JSON.    
     final List<dynamic> jsonList = json.decode(response.body) as List<dynamic>;
 
     return jsonList

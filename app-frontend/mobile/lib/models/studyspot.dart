@@ -24,32 +24,25 @@ class StudySpot {
   });
 
   factory StudySpot.fromJson(Map<String, dynamic> json) {    
-    List<StudySpot> studySpotList;
-    
-    // TODO - Loop through every study spot and create the list
+
     return switch (json) {
       {
-        'id': int spotId,
-        'name': String name,
-        'address': String address,
+        'id': int spotId,              
         'hasCharging': bool hasCharging,
         'seating': int seating,
-        'coffeeQuality': int coffeeQuality,
-        'generalPrice': String generalPrice,
+        'coffeeQuality': int coffeeQuality,        
         'openUntil': DateTime openUntil,
-        'drinkOrder': String drinkOrder,
-        'extraNotes': String extraNotes
       } => StudySpot(        
         spotId: spotId,
-        name: name,
-        address: address,
+        name: json["name"],
+        address: json["address"],
         hasCharging: hasCharging,
         seating: seating,
         coffeeQuality: coffeeQuality,
-        generalPrice: generalPrice,
+        generalPrice: json["generalPrice"],
         openUntil: openUntil,
-        drinkOrder: drinkOrder,
-        extraNotes: extraNotes,
+        drinkOrder: json["drinkOrder"],
+        extraNotes: json["extraNotes"],
       ),
       _ => throw const FormatException('Failed to load study spot.'), 
     };
