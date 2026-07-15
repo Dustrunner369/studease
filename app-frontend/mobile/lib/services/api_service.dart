@@ -11,7 +11,7 @@ Future<void> main() async {
     final spots = await fetchStudySpots();
     
     for (StudySpot s in spots) {
-      print(s);
+      print(s.toString());
     }
 
   } catch (e) {

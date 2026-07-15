@@ -6,7 +6,7 @@ class StudySpot {
   final int seating;
   final int coffeeQuality;
   final String? generalPrice;
-  final DateTime openUntil;
+  final String openUntil;
   final String? drinkOrder;
   final String? extraNotes;
 
@@ -24,14 +24,14 @@ class StudySpot {
   });
 
   factory StudySpot.fromJson(Map<String, dynamic> json) {    
-
+    
     return switch (json) {
       {
         'id': int spotId,              
         'hasCharging': bool hasCharging,
         'seating': int seating,
         'coffeeQuality': int coffeeQuality,        
-        'openUntil': DateTime openUntil,
+        'openUntil': String openUntil,
       } => StudySpot(        
         spotId: spotId,
         name: json["name"],
@@ -46,5 +46,9 @@ class StudySpot {
       ),
       _ => throw const FormatException('Failed to load study spot.'), 
     };
+  }
+  @override
+  String toString() {    
+    return "Name: $name \nAddress: $address \nhasCharging: $hasCharging \nopenUntil: $openUntil";
   }
 }
