@@ -1,200 +1,15 @@
-// STUDY SPOTS — concept 3: "clean ranked" (Beli-inspired)
-// simple + modern: white space, ranked rows, colored score bubbles,
-// pastel category illustrations, thin lines and small colorful accents
-//
-// Setup:
-//   1. pubspec.yaml needs google_fonts (you already have it).
-//   2. Save as lib/main_clean.dart and run with:
-//        flutter run -t lib/main_clean.dart
-//      (or paste over lib/main.dart)
-
-
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:mobile/services/api_service.dart';
+import 'package:mobile/models/studyspot.dart';
+import 'package:mobile/design/theme.dart';
 
 void main() {
-  runApp(const StudySpotsCleanApp());
+  runApp(const StudySpotApp());
 }
 
-// ---------------------------------------------------------------------------
-// Design tokens
-// ---------------------------------------------------------------------------
-
-abstract final class Tone {
-  static const bg = Color(0xFFFFFFFF);
-  static const ink = Color(0xFF101828); // near-black text
-  static const muted = Color(0xFF667085); // secondary text
-  static const line = Color(0xFFEAECF0); // hairline dividers
-  static const field = Color(0xFFF2F4F7); // search field / chips
-
-  // accent trio — used for small lines and illustration strokes
-  static const teal = Color(0xFF0BA574);
-  static const amber = Color(0xFFF5A623);
-  static const coral = Color(0xFFF4633A);
-}
-
-/// Beli-style score banding: the bubble color tells you the tier.
-Color scoreColor(double s) {
-  if (s >= 9.0) return const Color(0xFF0BA574); // emerald
-  if (s >= 8.0) return const Color(0xFF7CB342); // green
-  if (s >= 7.0) return const Color(0xFFF5A623); // amber
-  return const Color(0xFFF4633A); // coral
-}
-
-enum Level {
-  good(Color(0xFF0BA574), 'Great'),
-  ok(Color(0xFFF5A623), 'Okay'),
-  rough(Color(0xFFF4633A), 'Rough');
-
-  final Color color;
-  final String display;
-  const Level(this.color, this.display);
-}
-
-enum SpotType {
-  cafe('Café', Icons.local_cafe, Color(0xFFFFE8D9), Color(0xFFF4633A)),
-  library('Library', Icons.menu_book, Color(0xFFDDF3E8), Color(0xFF0BA574)),
-  campus('Campus', Icons.school, Color(0xFFECE8FD), Color(0xFF7A5AF8));
-
-  final String label;
-  final IconData icon;
-  final Color pastel; // circle background
-  final Color accent; // icon color
-  const SpotType(this.label, this.icon, this.pastel, this.accent);
-}
-
-// ---------------------------------------------------------------------------
-// Model + sample data (same shape as concepts 1 & 2)
-// ---------------------------------------------------------------------------
-
-class StudySpot {
-  final String name;
-  final SpotType type;
-  final double score;
-  final String distance;
-  final String hours;
-  final Level wifi;
-  final Level seating;
-  final Level noise;
-  final Level coffee;
-  final Level outlets;
-
-  const StudySpot({
-    required this.name,
-    required this.type,
-    required this.score,
-    required this.distance,
-    required this.hours,
-    required this.wifi,
-    required this.seating,
-    required this.noise,
-    required this.coffee,
-    required this.outlets,
-  });
-
-  List<(IconData, String, Level)> get amenities => [
-        (Icons.wifi, 'Wi-Fi', wifi),
-        (Icons.event_seat, 'Seating', seating),
-        (Icons.volume_up, 'Noise', noise),
-        (Icons.local_cafe, 'Coffee', coffee),
-        (Icons.bolt, 'Outlets', outlets),
-      ];
-}
-
-// TODO: replace with ApiService.getSpots() once the .NET endpoint is wired up.
-const _sampleSpots = <StudySpot>[
-  StudySpot(
-    name: "Lestat's Coffee House",
-    type: SpotType.cafe,
-    score: 9.4,
-    distance: '4.6 mi',
-    hours: 'Open 24 hrs',
-    wifi: Level.good,
-    seating: Level.good,
-    noise: Level.ok,
-    coffee: Level.good,
-    outlets: Level.good,
-  ),
-  StudySpot(
-    name: 'Ryan Library',
-    type: SpotType.library,
-    score: 9.1,
-    distance: '0.2 mi',
-    hours: 'Til 11 pm',
-    wifi: Level.good,
-    seating: Level.good,
-    noise: Level.good,
-    coffee: Level.rough,
-    outlets: Level.good,
-  ),
-  StudySpot(
-    name: 'Fermanian Lounge',
-    type: SpotType.campus,
-    score: 8.6,
-    distance: '0.1 mi',
-    hours: 'Til 10 pm',
-    wifi: Level.good,
-    seating: Level.ok,
-    noise: Level.good,
-    coffee: Level.rough,
-    outlets: Level.ok,
-  ),
-  StudySpot(
-    name: 'Communal Coffee',
-    type: SpotType.cafe,
-    score: 8.4,
-    distance: '5.1 mi',
-    hours: 'Til 5 pm',
-    wifi: Level.ok,
-    seating: Level.ok,
-    noise: Level.ok,
-    coffee: Level.good,
-    outlets: Level.rough,
-  ),
-  StudySpot(
-    name: 'Moniker General',
-    type: SpotType.cafe,
-    score: 8.0,
-    distance: '3.4 mi',
-    hours: 'Til 9 pm',
-    wifi: Level.good,
-    seating: Level.good,
-    noise: Level.rough,
-    coffee: Level.good,
-    outlets: Level.ok,
-  ),
-  StudySpot(
-    name: 'Hervey Branch Library',
-    type: SpotType.library,
-    score: 7.9,
-    distance: '1.2 mi',
-    hours: 'Til 6 pm',
-    wifi: Level.ok,
-    seating: Level.good,
-    noise: Level.good,
-    coffee: Level.rough,
-    outlets: Level.ok,
-  ),
-  StudySpot(
-    name: 'Better Buzz Point Loma',
-    type: SpotType.cafe,
-    score: 7.6,
-    distance: '1.8 mi',
-    hours: 'Til 7 pm',
-    wifi: Level.ok,
-    seating: Level.rough,
-    noise: Level.rough,
-    coffee: Level.good,
-    outlets: Level.rough,
-  ),
-];
-
-// ---------------------------------------------------------------------------
-// App
-// ---------------------------------------------------------------------------
-
-class StudySpotsCleanApp extends StatelessWidget {
-  const StudySpotsCleanApp({super.key});
+class StudySpotApp extends StatelessWidget {
+  const StudySpotApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -215,6 +30,57 @@ class StudySpotsCleanApp extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
+// Model → UI adapter
+//
+// The API model (studyspot.dart) doesn't carry UI concepts like score, type,
+// or amenity levels, so they're derived here.
+//
+// ASSUMPTION: `seating` and `coffeeQuality` are 1–5 ratings. If your backend
+// uses a different scale, adjust _levelFor and `score` — everything else
+// reads through this extension.
+// ---------------------------------------------------------------------------
+
+Level _levelFor(int rating) {
+  if (rating >= 4) return Level.good;
+  if (rating >= 3) return Level.ok;
+  return Level.rough;
+}
+
+extension SpotPresentation on StudySpot {
+  String get displayName => name ?? 'Unnamed spot';
+
+  /// The backend has no `type` field yet, so every spot renders as a café.
+  SpotType get type => SpotType.cafe;
+
+  /// One-line summary for the list row.
+  String get subtitle => [
+        if (address != null) address!,
+        'Until $openUntil',
+      ].join(' · ');
+
+  /// 0–10: two 1–5 ratings summed, plus a half point for charging.
+  double get score {
+    final base = (seating + coffeeQuality).toDouble();
+    final bonus = hasCharging ? 0.5 : 0.0;
+    return (base + bonus).clamp(0.0, 10.0).toDouble();
+  }
+
+  List<(IconData, String, Level)> get amenities => [
+        (Icons.bolt, 'Charging', hasCharging ? Level.good : Level.rough),
+        (Icons.event_seat, 'Seating', _levelFor(seating)),
+        (Icons.local_cafe, 'Coffee', _levelFor(coffeeQuality)),
+      ];
+
+  /// Optional free-text fields, shown in the detail sheet when present.
+  List<(IconData, String, String)> get details => [
+        if (address != null) (Icons.place_outlined, 'Address', address!),
+        if (generalPrice != null) (Icons.attach_money, 'Price', generalPrice!),
+        if (drinkOrder != null) (Icons.coffee, 'Usual order', drinkOrder!),
+        if (extraNotes != null) (Icons.notes, 'Notes', extraNotes!),
+      ];
+}
+
+// ---------------------------------------------------------------------------
 // Spots page
 // ---------------------------------------------------------------------------
 
@@ -227,12 +93,21 @@ class SpotsPage extends StatefulWidget {
 
 class _SpotsPageState extends State<SpotsPage> {
   SpotType? _filter;
+  late Future<List<StudySpot>> _studySpots;
 
-  List<StudySpot> get _visibleSpots {
-    final spots =
-        _sampleSpots.where((s) => _filter == null || s.type == _filter).toList();
-    spots.sort((a, b) => b.score.compareTo(a.score));
-    return spots;
+  @override
+  void initState() {
+    super.initState();
+    _studySpots = fetchStudySpots();
+  }
+
+  Future<void> _reload() {
+    final next = fetchStudySpots();
+    setState(() {
+      _studySpots = next;
+    });
+    // Swallow the error here; FutureBuilder surfaces it in the UI.
+    return next.then<void>((_) {}).catchError((_) {});
   }
 
   void _soon(String message) {
@@ -255,36 +130,45 @@ class _SpotsPageState extends State<SpotsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final spots = _visibleSpots;
-
     return Scaffold(
       body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.only(bottom: 110),
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+        child: FutureBuilder<List<StudySpot>>(
+          future: _studySpots,
+          builder: (context, snapshot) {
+            final spots = snapshot.data;
+            final visible = spots == null
+                ? const <StudySpot>[]
+                : (_filter == null
+                    ? spots
+                    : spots.where((s) => s.type == _filter).toList());
+
+            return RefreshIndicator(
+              color: Tone.ink,
+              onRefresh: _reload,
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.only(bottom: 110),
                 children: [
-                  _buildHeader(),
-                  const SizedBox(height: 16),
-                  _buildSearchBar(),
-                  const SizedBox(height: 14),
-                  _buildFilters(),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildHeader(spots?.length),
+                        const SizedBox(height: 16),
+                        _buildSearchBar(),
+                        const SizedBox(height: 14),
+                        _buildFilters(),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Divider(height: 1, thickness: 1, color: Tone.line),
+                  ..._buildBody(snapshot, visible),
                 ],
               ),
-            ),
-            const SizedBox(height: 8),
-            const Divider(height: 1, thickness: 1, color: Tone.line),
-            for (var i = 0; i < spots.length; i++) ...[
-              SpotRow(rank: i + 1, spot: spots[i]),
-              const Padding(
-                padding: EdgeInsets.only(left: 20),
-                child: Divider(height: 1, thickness: 1, color: Tone.line),
-              ),
-            ],
-          ],
+            );
+          },
         ),
       ),
       floatingActionButton: FloatingActionButton(
@@ -297,7 +181,70 @@ class _SpotsPageState extends State<SpotsPage> {
     );
   }
 
-  Widget _buildHeader() {
+  List<Widget> _buildBody(
+    AsyncSnapshot<List<StudySpot>> snapshot,
+    List<StudySpot> visible,
+  ) {
+    if (snapshot.connectionState == ConnectionState.waiting) {
+      return const [
+        Padding(
+          padding: EdgeInsets.symmetric(vertical: 80),
+          child: Center(
+            child: SizedBox(
+              width: 26,
+              height: 26,
+              child: CircularProgressIndicator(
+                strokeWidth: 2.5,
+                color: Tone.ink,
+              ),
+            ),
+          ),
+        ),
+      ];
+    }
+
+    if (snapshot.hasError) {
+      return [_ErrorBox(error: snapshot.error!, onRetry: _reload)];
+    }
+
+    if (visible.isEmpty) {
+      return [
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 80),
+          child: Center(
+            child: Text(
+              _filter == null
+                  ? 'No spots yet'
+                  : 'No ${_filter!.label.toLowerCase()} spots',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: Tone.muted,
+              ),
+            ),
+          ),
+        ),
+      ];
+    }
+
+    return [
+      for (var i = 0; i < visible.length; i++) ...[
+        SpotRow(rank: i + 1, spot: visible[i]),
+        const Padding(
+          padding: EdgeInsets.only(left: 20),
+          child: Divider(height: 1, thickness: 1, color: Tone.line),
+        ),
+      ],
+    ];
+  }
+
+  Widget _buildHeader(int? count) {
+    final countLabel = switch (count) {
+      null => 'Point Loma',
+      1 => '1 spot · Point Loma',
+      _ => '$count spots · Point Loma',
+    };
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -332,7 +279,7 @@ class _SpotsPageState extends State<SpotsPage> {
               ),
               const SizedBox(height: 10),
               Text(
-                '${_sampleSpots.length} spots · Point Loma',
+                countLabel,
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: 13,
                   fontWeight: FontWeight.w500,
@@ -415,6 +362,71 @@ class _SpotsPageState extends State<SpotsPage> {
 }
 
 // ---------------------------------------------------------------------------
+// Error state
+// ---------------------------------------------------------------------------
+
+class _ErrorBox extends StatelessWidget {
+  final Object error;
+  final Future<void> Function() onRetry;
+
+  const _ErrorBox({required this.error, required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(32, 60, 32, 60),
+      child: Column(
+        children: [
+          const Icon(Icons.cloud_off, size: 32, color: Tone.muted),
+          const SizedBox(height: 12),
+          Text(
+            "Couldn't load spots",
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color: Tone.ink,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '$error',
+            textAlign: TextAlign.center,
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 12.5,
+              fontWeight: FontWeight.w500,
+              color: Tone.muted,
+            ),
+          ),
+          const SizedBox(height: 16),
+          InkWell(
+            onTap: onRetry,
+            borderRadius: BorderRadius.circular(20),
+            child: Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 22, vertical: 10),
+              decoration: BoxDecoration(
+                color: Tone.ink,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                'Retry',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Ranked row
 // ---------------------------------------------------------------------------
 
@@ -455,7 +467,9 @@ class SpotRow extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    spot.name,
+                    spot.displayName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: GoogleFonts.plusJakartaSans(
                       fontSize: 15.5,
                       fontWeight: FontWeight.w700,
@@ -464,7 +478,9 @@ class SpotRow extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    '${spot.distance} · ${spot.hours}',
+                    spot.subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: GoogleFonts.plusJakartaSans(
                       fontSize: 12.5,
                       fontWeight: FontWeight.w500,
@@ -572,131 +588,185 @@ class SpotDetailSheet extends StatelessWidget {
         color: Tone.bg,
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(22, 12, 22, 22),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Tone.line,
-                    borderRadius: BorderRadius.circular(4),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.85,
+        ),
+        child: SafeArea(
+          top: false,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(22, 12, 22, 22),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Tone.line,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 20),
-              Row(
-                children: [
-                  _CategoryCircle(type: spot.type),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                const SizedBox(height: 20),
+                Row(
+                  children: [
+                    _CategoryCircle(type: spot.type),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            spot.displayName,
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 19,
+                              fontWeight: FontWeight.w800,
+                              color: Tone.ink,
+                              height: 1.15,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '${spot.type.label} · Until ${spot.openUntil}',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w500,
+                              color: Tone.muted,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    _ScoreBubble(score: spot.score),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                const Divider(height: 1, thickness: 1, color: Tone.line),
+                const SizedBox(height: 16),
+                Text(
+                  'THE RUNDOWN',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1.2,
+                    color: Tone.muted,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                for (final (icon, label, level) in spot.amenities)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Row(
                       children: [
-                        Text(
-                          spot.name,
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 19,
-                            fontWeight: FontWeight.w800,
-                            color: Tone.ink,
-                            height: 1.15,
+                        Icon(icon, size: 19, color: Tone.muted),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            label,
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 14.5,
+                              fontWeight: FontWeight.w600,
+                              color: Tone.ink,
+                            ),
                           ),
                         ),
-                        const SizedBox(height: 2),
+                        Container(
+                          width: 8,
+                          height: 8,
+                          margin: const EdgeInsets.only(right: 8),
+                          decoration: BoxDecoration(
+                            color: level.color,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
                         Text(
-                          '${spot.type.label} · ${spot.distance} · ${spot.hours}',
+                          level.display,
                           style: GoogleFonts.plusJakartaSans(
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w500,
-                            color: Tone.muted,
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w700,
+                            color: level.color,
                           ),
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(width: 10),
-                  _ScoreBubble(score: spot.score),
-                ],
-              ),
-              const SizedBox(height: 20),
-              const Divider(height: 1, thickness: 1, color: Tone.line),
-              const SizedBox(height: 16),
-              Text(
-                'THE RUNDOWN',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 1.2,
-                  color: Tone.muted,
-                ),
-              ),
-              const SizedBox(height: 6),
-              for (final (icon, label, level) in spot.amenities)
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: Row(
-                    children: [
-                      Icon(icon, size: 19, color: Tone.muted),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          label,
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 14.5,
-                            fontWeight: FontWeight.w600,
-                            color: Tone.ink,
+                if (spot.details.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  Text(
+                    'DETAILS',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 1.2,
+                      color: Tone.muted,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  for (final (icon, label, value) in spot.details)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(icon, size: 19, color: Tone.muted),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  label,
+                                  style: GoogleFonts.plusJakartaSans(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: Tone.muted,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  value,
+                                  style: GoogleFonts.plusJakartaSans(
+                                    fontSize: 14.5,
+                                    fontWeight: FontWeight.w600,
+                                    color: Tone.ink,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
+                        ],
                       ),
-                      Container(
-                        width: 8,
-                        height: 8,
-                        margin: const EdgeInsets.only(right: 8),
-                        decoration: BoxDecoration(
-                          color: level.color,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      Text(
-                        level.display,
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 13.5,
-                          fontWeight: FontWeight.w700,
-                          color: level.color,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              const SizedBox(height: 18),
-              Row(
-                children: [
-                  Expanded(
-                    child: _SheetButton(
-                      label: 'Directions',
-                      icon: Icons.near_me,
-                      filled: true,
-                      onTap: () => _soon(context, 'Directions — coming soon'),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _SheetButton(
-                      label: 'Edit spot',
-                      icon: Icons.edit_outlined,
-                      filled: false,
-                      onTap: () => _soon(context, 'Edit spot — coming soon'),
-                    ),
-                  ),
                 ],
-              ),
-            ],
+                const SizedBox(height: 18),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _SheetButton(
+                        label: 'Directions',
+                        icon: Icons.near_me,
+                        filled: true,
+                        onTap: () =>
+                            _soon(context, 'Directions — coming soon'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _SheetButton(
+                        label: 'Edit spot',
+                        icon: Icons.edit_outlined,
+                        filled: false,
+                        onTap: () => _soon(context, 'Edit spot — coming soon'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -790,9 +860,9 @@ class _NavItem extends StatelessWidget {
   final bool active;
 
   const _NavItem({
-    required this.icon, 
-    required this.label, 
-    required this.active
+    required this.icon,
+    required this.label,
+    required this.active,
   });
 
   @override
