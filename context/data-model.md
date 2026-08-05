@@ -99,8 +99,10 @@ external identity provider and treats that pair as the login key.
 
 One row per real-world place. **Globally shared** — not owned by whoever added it.
 
-- `google_place_id` is `NOT NULL UNIQUE`. This is what stops duplicates. Adding a spot is
-  "resolve a Place ID, then insert-or-return", never "insert whatever the user typed".
+- `google_place_id` carries a **partial** unique index (`WHERE google_place_id IS NOT
+  NULL`). This is what stops duplicates: adding a Places-backed spot is "resolve a Place
+  ID, then insert-or-return", never "insert whatever the user typed". It's nullable
+  because manual entry has to stay possible — see decision D9 in the README.
 - `name`, `formatted_address`, `latitude`, `longitude`, `price_level`, `website_url`,
   `phone` are all snapshots from Places, refreshed on a schedule; `places_synced_at`
   records when. They're stored so lists render without an API call per row.
@@ -304,11 +306,14 @@ Field-by-field, for when you re-seed:
 | `ExtraNotes` | `spot_entries.notes` | |
 | — | `spot_entries.wifi`, `noise` | New; no source data, enter by hand |
 
-Client-side fallout, all of it required:
+Client-side fallout — **done for Flutter, still outstanding for Angular**:
 
-- `lib/models/studyspot.dart` — split into `Spot` and `SpotEntry`; `openUntil` becomes
-  nullable; `id` becomes `String`; drop the local score assumption at `main.dart:38`.
-- `main.dart:53` — `SpotType` stops being hardcoded to `cafe` and reads `spot.type`.
-- `main.dart:62` — delete the `score` getter; the server sends the score.
-- `frontend/src/services/study-spot.service.ts` — the `StudySpot` interface splits the
-  same way; the `db.json` import and `openUntil: new Date(...)` mapping go away.
+- ~~`lib/models/studyspot.dart`~~ — replaced by `lib/models/spot.dart` with `Ratings`,
+  `MySpotListItem`, `SpotEntry`, `SpotDetail` and `PlaceSuggestion`. `openUntil` is
+  nullable, ids are `String`, and the local score calculation is gone.
+- ~~`main.dart` `SpotType` hardcoded to `cafe`~~ — now reads `spot.type` off the wire.
+- ~~`main.dart` `score` getter~~ — deleted; Postgres computes the score.
+- **`frontend/src/services/study-spot.service.ts` is now broken.** The Angular app still
+  calls `/studyspots`, which no longer exists. Its `StudySpot` interface needs the same
+  split, and the `db.json` import with its `openUntil: new Date(...)` mapping should go.
+  Untouched so far — the Flutter app was the one being built.

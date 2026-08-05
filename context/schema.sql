@@ -3,6 +3,9 @@
 -- REFERENCE ONLY. EF Core migrations in backend/Migrations are the source of truth;
 -- this file is what those migrations should produce. Keep them in step.
 --
+-- STATUS: users, spots and spot_entries are BUILT and verified against Postgres 15.
+-- follows, photos and activity_events are DESIGNED ONLY — v2/v3 in the build order.
+--
 -- Conventions: snake_case, uuid PKs (UUIDv7 minted by the app), timestamptz in UTC,
 -- enums as text + CHECK. See data-model.md for the reasoning behind each.
 
@@ -29,9 +32,10 @@ CREATE TABLE users (
     CONSTRAINT users_auth_identity_unique UNIQUE (auth_provider, auth_subject)
 );
 
--- Handles are unique case-insensitively: @Matt and @matt are the same person.
-CREATE UNIQUE INDEX users_handle_lower_key ON users (lower(handle));
-CREATE UNIQUE INDEX users_email_lower_key  ON users (lower(email)) WHERE email IS NOT NULL;
+-- Handles are unique case-insensitively. Built as a plain unique index with handles
+-- stored already-lowercased, rather than an expression index on lower(handle) — EF
+-- can express the former in a migration and not the latter.
+CREATE UNIQUE INDEX users_handle_key ON users (handle);
 
 -- ---------------------------------------------------------------------------
 -- spots — one row per real-world place, shared by every user
@@ -42,18 +46,27 @@ CREATE TABLE spots (
 
     -- The dedupe key. Two users adding the same cafe resolve to the same Place ID
     -- and therefore the same row.
-    google_place_id   text        NOT NULL UNIQUE,
+    --
+    -- Nullable (decision D9): a campus study room or a specific library floor isn't a
+    -- Google Place at all, so manual entry has to be possible. The uniqueness that
+    -- matters is enforced by a partial index below, not by this column.
+    google_place_id   text,
 
     -- Snapshot of Places data, refreshed on a schedule. Stored so a list of spots
     -- renders without one API call per row. NOT a permanent copy — see data-model.md
     -- on Google's caching terms.
     name              text        NOT NULL,
     formatted_address text,
-    latitude          double precision NOT NULL,
-    longitude         double precision NOT NULL,
+    -- Null for manually entered spots: typed addresses aren't geocoded, so those
+    -- spots stay off the Map tab until someone links them to a real place.
+    latitude          double precision,
+    longitude         double precision,
     price_level       smallint,
     website_url       text,
     phone             text,
+    -- Offset from UTC at this place, used to work out its local "now" when deciding
+    -- what time it closes today. From Places; null for manual spots.
+    utc_offset_minutes integer,
     places_synced_at  timestamptz,
 
     -- Derived from Places `types` at creation, then user-editable.
@@ -77,10 +90,15 @@ CREATE TABLE spots (
     -- Places API at render time (decision D8).
 
     CONSTRAINT spots_type_valid  CHECK (type IN ('cafe', 'library', 'campus', 'other')),
-    CONSTRAINT spots_price_range CHECK (price_level BETWEEN 0 AND 4),
-    CONSTRAINT spots_lat_range   CHECK (latitude  BETWEEN  -90 AND  90),
-    CONSTRAINT spots_lng_range   CHECK (longitude BETWEEN -180 AND 180)
+    CONSTRAINT spots_price_range CHECK (price_level IS NULL OR price_level BETWEEN 0 AND 4),
+    CONSTRAINT spots_lat_range   CHECK (latitude  IS NULL OR latitude  BETWEEN  -90 AND  90),
+    CONSTRAINT spots_lng_range   CHECK (longitude IS NULL OR longitude BETWEEN -180 AND 180)
 );
+
+-- Unique only where present, so Places-backed spots still dedupe exactly while
+-- manually entered spots don't all collide on NULL.
+CREATE UNIQUE INDEX spots_google_place_id_key ON spots (google_place_id)
+    WHERE google_place_id IS NOT NULL;
 
 CREATE INDEX spots_type_idx    ON spots (type);
 -- Good enough for bounding-box "spots near me". If the Map tab needs true radius
@@ -137,7 +155,7 @@ CREATE INDEX spot_entries_user_score_idx ON spot_entries (user_id, score DESC, u
 CREATE INDEX spot_entries_spot_idx       ON spot_entries (spot_id) WHERE visibility <> 'private';
 
 -- ---------------------------------------------------------------------------
--- follows
+-- follows                                                    (DESIGNED, NOT BUILT)
 -- ---------------------------------------------------------------------------
 
 CREATE TABLE follows (
@@ -156,7 +174,7 @@ CREATE TABLE follows (
 CREATE INDEX follows_followee_idx ON follows (followee_id, status);
 
 -- ---------------------------------------------------------------------------
--- photos — metadata only; bytes live in object storage
+-- photos — metadata only; bytes live in object storage      (DESIGNED, NOT BUILT)
 -- ---------------------------------------------------------------------------
 
 CREATE TABLE photos (
@@ -188,7 +206,7 @@ CREATE INDEX photos_spot_idx  ON photos (spot_id) WHERE deleted_at IS NULL;
 CREATE INDEX photos_entry_idx ON photos (entry_id) WHERE entry_id IS NOT NULL AND deleted_at IS NULL;
 
 -- ---------------------------------------------------------------------------
--- activity_events — append-only feed source, fanned out on read
+-- activity_events — append-only feed source                 (DESIGNED, NOT BUILT)
 -- ---------------------------------------------------------------------------
 
 CREATE TABLE activity_events (
@@ -216,17 +234,24 @@ CREATE INDEX activity_actor_idx ON activity_events (actor_id, id DESC) WHERE vis
 -- ---------------------------------------------------------------------------
 -- updated_at maintenance
 -- ---------------------------------------------------------------------------
-
-CREATE OR REPLACE FUNCTION set_updated_at() RETURNS trigger AS $$
-BEGIN
-    NEW.updated_at = now();
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER users_updated_at        BEFORE UPDATE ON users
-    FOR EACH ROW EXECUTE FUNCTION set_updated_at();
-CREATE TRIGGER spots_updated_at        BEFORE UPDATE ON spots
-    FOR EACH ROW EXECUTE FUNCTION set_updated_at();
-CREATE TRIGGER spot_entries_updated_at BEFORE UPDATE ON spot_entries
-    FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+--
+-- NOT BUILT AS TRIGGERS. AppDbContext.StampTimestamps() sets created_at/updated_at
+-- in SaveChanges instead, which keeps the behaviour visible in C# rather than hidden
+-- in SQL a reader of the entity classes would never think to look for.
+--
+-- The trigger version is kept here for anyone who'd rather push it into the database
+-- — if you switch, delete StampTimestamps() so the two don't fight.
+--
+-- CREATE OR REPLACE FUNCTION set_updated_at() RETURNS trigger AS $$
+-- BEGIN
+--     NEW.updated_at = now();
+--     RETURN NEW;
+-- END;
+-- $$ LANGUAGE plpgsql;
+--
+-- CREATE TRIGGER users_updated_at        BEFORE UPDATE ON users
+--     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+-- CREATE TRIGGER spots_updated_at        BEFORE UPDATE ON spots
+--     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+-- CREATE TRIGGER spot_entries_updated_at BEFORE UPDATE ON spot_entries
+--     FOR EACH ROW EXECUTE FUNCTION set_updated_at();

@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:mobile/features/study_spots/presentation/add_spot_sheet.dart';
 import 'package:mobile/services/api_service.dart';
-import 'package:mobile/models/studyspot.dart';
+import 'package:mobile/models/spot.dart';
 import 'package:mobile/design/theme.dart';
 
 void main() {
@@ -32,51 +33,35 @@ class StudySpotApp extends StatelessWidget {
 // ---------------------------------------------------------------------------
 // Model → UI adapter
 //
-// The API model (studyspot.dart) doesn't carry UI concepts like score, type,
-// or amenity levels, so they're derived here.
-//
-// ASSUMPTION: `seating` and `coffeeQuality` are 1–5 ratings. If your backend
-// uses a different scale, adjust _levelFor and `score` — everything else
-// reads through this extension.
+// The API sends each spot already joined to my rating of it, with the 0–10 score
+// computed by Postgres. Nothing here recalculates it — this is only about turning
+// those values into icons, labels and colours.
 // ---------------------------------------------------------------------------
 
-Level _levelFor(int rating) {
-  if (rating >= 4) return Level.good;
-  if (rating >= 3) return Level.ok;
-  return Level.rough;
-}
-
-extension SpotPresentation on StudySpot {
-  String get displayName => name ?? 'Unnamed spot';
-
-  /// The backend has no `type` field yet, so every spot renders as a café.
-  SpotType get type => SpotType.cafe;
-
+extension SpotPresentation on MySpotListItem {
   /// One-line summary for the list row.
+  ///
+  /// No opening hours: they'd cost a Places lookup per row, so the detail sheet
+  /// fetches them instead.
   String get subtitle => [
-        if (address != null) address!,
-        'Until $openUntil',
+        if (address != null && address!.isNotEmpty) address!,
+        if (priceLevel != null && priceLevel! > 0) '\$' * priceLevel!,
       ].join(' · ');
 
-  /// 0–10: two 1–5 ratings summed, plus a half point for charging.
-  double get score {
-    final base = (seating + coffeeQuality).toDouble();
-    final bonus = hasCharging ? 0.5 : 0.0;
-    return (base + bonus).clamp(0.0, 10.0).toDouble();
-  }
-
   List<(IconData, String, Level)> get amenities => [
-        (Icons.bolt, 'Charging', hasCharging ? Level.good : Level.rough),
-        (Icons.event_seat, 'Seating', _levelFor(seating)),
-        (Icons.local_cafe, 'Coffee', _levelFor(coffeeQuality)),
+        (Icons.wifi, 'WiFi', levelFor(ratings.wifi)),
+        (Icons.volume_off, 'Quiet', levelFor(ratings.noise)),
+        (Icons.bolt, 'Outlets', levelFor(ratings.outlets)),
+        (Icons.event_seat, 'Seating', levelFor(ratings.seating)),
+        (Icons.local_cafe, 'Coffee', levelFor(ratings.coffee)),
       ];
 
   /// Optional free-text fields, shown in the detail sheet when present.
   List<(IconData, String, String)> get details => [
-        if (address != null) (Icons.place_outlined, 'Address', address!),
-        if (generalPrice != null) (Icons.attach_money, 'Price', generalPrice!),
-        if (drinkOrder != null) (Icons.coffee, 'Usual order', drinkOrder!),
-        if (extraNotes != null) (Icons.notes, 'Notes', extraNotes!),
+        if (address != null && address!.isNotEmpty)
+          (Icons.place_outlined, 'Address', address!),
+        if (coffeeOrder != null) (Icons.coffee, 'Usual order', coffeeOrder!),
+        if (notes != null) (Icons.notes, 'Notes', notes!),
       ];
 }
 
@@ -93,21 +78,107 @@ class SpotsPage extends StatefulWidget {
 
 class _SpotsPageState extends State<SpotsPage> {
   SpotType? _filter;
-  late Future<List<StudySpot>> _studySpots;
+
+  // Held as a list rather than a Future so a row can be removed the instant it's
+  // swiped away, without waiting for the server to confirm.
+  List<MySpotListItem>? _spots;
+  Object? _error;
+  bool _loading = true;
 
   @override
   void initState() {
     super.initState();
-    _studySpots = fetchStudySpots();
+    _load();
   }
 
-  Future<void> _reload() {
-    final next = fetchStudySpots();
+  Future<void> _load() async {
     setState(() {
-      _studySpots = next;
+      // Only blank the page on the first load — a pull-to-refresh keeps the list
+      // on screen and shows its own spinner.
+      _loading = _spots == null;
+      _error = null;
     });
-    // Swallow the error here; FutureBuilder surfaces it in the UI.
-    return next.then<void>((_) {}).catchError((_) {});
+
+    try {
+      final spots = await fetchMySpots();
+      if (!mounted) return;
+      setState(() {
+        _spots = spots;
+        _loading = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _error = error;
+        _loading = false;
+      });
+    }
+  }
+
+  Future<void> _addSpot() async {
+    final saved = await showAddSpotSheet(context);
+    if (saved == true && mounted) await _load();
+  }
+
+  Future<void> _deleteSpot(MySpotListItem spot) async {
+    // Drop it from the list first: a Dismissible has to leave the tree as soon as
+    // it's dismissed, and the undo below puts it back if asked.
+    setState(() => _spots = [...?_spots]..removeWhere((s) => s.entryId == spot.entryId));
+
+    try {
+      await deleteEntry(spot.spotId);
+    } catch (_) {
+      if (!mounted) return;
+      _soon('Could not remove ${spot.name}');
+      await _load();
+      return;
+    }
+
+    if (!mounted) return;
+    _showUndo(spot);
+  }
+
+  /// Undo re-saves the same ratings. Deleting an entry leaves the spot itself
+  /// alone, so this puts the rating back exactly where it was.
+  void _showUndo(MySpotListItem spot) {
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: Tone.ink,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        duration: const Duration(seconds: 5),
+        content: Text(
+          'Removed ${spot.name}',
+          style: GoogleFonts.plusJakartaSans(
+            color: Colors.white,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        action: SnackBarAction(
+          label: 'Undo',
+          textColor: Tone.amber,
+          onPressed: () => _restore(spot),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _restore(MySpotListItem spot) async {
+    try {
+      await saveEntry(
+        spotId: spot.spotId,
+        ratings: spot.ratings,
+        coffeeOrder: spot.coffeeOrder,
+        notes: spot.notes,
+      );
+    } catch (_) {
+      if (!mounted) return;
+      _soon('Could not restore ${spot.name}');
+    }
+
+    if (!mounted) return;
+    await _load();
   }
 
   void _soon(String message) {
@@ -130,49 +201,42 @@ class _SpotsPageState extends State<SpotsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final spots = _spots;
+    final visible = spots == null
+        ? const <MySpotListItem>[]
+        : (_filter == null ? spots : spots.where((s) => s.type == _filter).toList());
+
     return Scaffold(
       body: SafeArea(
-        child: FutureBuilder<List<StudySpot>>(
-          future: _studySpots,
-          builder: (context, snapshot) {
-            final spots = snapshot.data;
-            final visible = spots == null
-                ? const <StudySpot>[]
-                : (_filter == null
-                    ? spots
-                    : spots.where((s) => s.type == _filter).toList());
-
-            return RefreshIndicator(
-              color: Tone.ink,
-              onRefresh: _reload,
-              child: ListView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.only(bottom: 110),
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildHeader(spots?.length),
-                        const SizedBox(height: 16),
-                        _buildSearchBar(),
-                        const SizedBox(height: 14),
-                        _buildFilters(),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  const Divider(height: 1, thickness: 1, color: Tone.line),
-                  ..._buildBody(snapshot, visible),
-                ],
+        child: RefreshIndicator(
+          color: Tone.ink,
+          onRefresh: _load,
+          child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.only(bottom: 110),
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildHeader(spots?.length),
+                    const SizedBox(height: 16),
+                    _buildSearchBar(),
+                    const SizedBox(height: 14),
+                    _buildFilters(),
+                  ],
+                ),
               ),
-            );
-          },
+              const SizedBox(height: 8),
+              const Divider(height: 1, thickness: 1, color: Tone.line),
+              ..._buildBody(visible),
+            ],
+          ),
         ),
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => _soon('Add a spot — coming soon'),
+        onPressed: _addSpot,
         backgroundColor: Tone.ink,
         shape: const CircleBorder(),
         child: const Icon(Icons.add, color: Colors.white),
@@ -181,11 +245,8 @@ class _SpotsPageState extends State<SpotsPage> {
     );
   }
 
-  List<Widget> _buildBody(
-    AsyncSnapshot<List<StudySpot>> snapshot,
-    List<StudySpot> visible,
-  ) {
-    if (snapshot.connectionState == ConnectionState.waiting) {
+  List<Widget> _buildBody(List<MySpotListItem> visible) {
+    if (_loading) {
       return const [
         Padding(
           padding: EdgeInsets.symmetric(vertical: 80),
@@ -203,8 +264,8 @@ class _SpotsPageState extends State<SpotsPage> {
       ];
     }
 
-    if (snapshot.hasError) {
-      return [_ErrorBox(error: snapshot.error!, onRetry: _reload)];
+    if (_error != null) {
+      return [_ErrorBox(error: _error!, onRetry: _load)];
     }
 
     if (visible.isEmpty) {
@@ -214,7 +275,7 @@ class _SpotsPageState extends State<SpotsPage> {
           child: Center(
             child: Text(
               _filter == null
-                  ? 'No spots yet'
+                  ? 'No spots yet — tap + to add one'
                   : 'No ${_filter!.label.toLowerCase()} spots',
               style: GoogleFonts.plusJakartaSans(
                 fontSize: 14,
@@ -229,7 +290,14 @@ class _SpotsPageState extends State<SpotsPage> {
 
     return [
       for (var i = 0; i < visible.length; i++) ...[
-        SpotRow(rank: i + 1, spot: visible[i]),
+        // Keyed by entry so dismissing one row doesn't take its neighbour's state
+        // with it when the list closes up.
+        _DismissibleSpotRow(
+          key: ValueKey(visible[i].entryId),
+          rank: i + 1,
+          spot: visible[i],
+          onDismissed: () => _deleteSpot(visible[i]),
+        ),
         const Padding(
           padding: EdgeInsets.only(left: 20),
           child: Divider(height: 1, thickness: 1, color: Tone.line),
@@ -430,9 +498,40 @@ class _ErrorBox extends StatelessWidget {
 // Ranked row
 // ---------------------------------------------------------------------------
 
+/// Wraps a row so it can be swiped away. Deleting removes only *my* rating —
+/// the place itself stays, which is what makes Undo a simple re-save.
+class _DismissibleSpotRow extends StatelessWidget {
+  final int rank;
+  final MySpotListItem spot;
+  final VoidCallback onDismissed;
+
+  const _DismissibleSpotRow({
+    super.key,
+    required this.rank,
+    required this.spot,
+    required this.onDismissed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Dismissible(
+      key: ValueKey('dismiss-${spot.entryId}'),
+      direction: DismissDirection.endToStart,
+      onDismissed: (_) => onDismissed(),
+      background: Container(
+        color: Tone.coral,
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 24),
+        child: const Icon(Icons.delete_outline, color: Colors.white),
+      ),
+      child: SpotRow(rank: rank, spot: spot),
+    );
+  }
+}
+
 class SpotRow extends StatelessWidget {
   final int rank;
-  final StudySpot spot;
+  final MySpotListItem spot;
 
   const SpotRow({super.key, required this.rank, required this.spot});
 
@@ -467,7 +566,7 @@ class SpotRow extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    spot.displayName,
+                    spot.name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: GoogleFonts.plusJakartaSans(
@@ -559,7 +658,7 @@ class _ScoreBubble extends StatelessWidget {
 // ---------------------------------------------------------------------------
 
 class SpotDetailSheet extends StatelessWidget {
-  final StudySpot spot;
+  final MySpotListItem spot;
 
   const SpotDetailSheet({super.key, required this.spot});
 
@@ -620,7 +719,7 @@ class SpotDetailSheet extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            spot.displayName,
+                            spot.name,
                             style: GoogleFonts.plusJakartaSans(
                               fontSize: 19,
                               fontWeight: FontWeight.w800,
@@ -629,14 +728,7 @@ class SpotDetailSheet extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(height: 2),
-                          Text(
-                            '${spot.type.label} · Until ${spot.openUntil}',
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w500,
-                              color: Tone.muted,
-                            ),
-                          ),
+                          _HoursLine(spot: spot),
                         ],
                       ),
                     ),
@@ -769,6 +861,53 @@ class SpotDetailSheet extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Opening hours are never stored — they're fetched from Google when the sheet
+/// opens. So this renders the category immediately and fills in "Until 22:00" if
+/// and when the lookup lands, staying quiet when Google has no hours to give.
+class _HoursLine extends StatefulWidget {
+  final MySpotListItem spot;
+
+  const _HoursLine({required this.spot});
+
+  @override
+  State<_HoursLine> createState() => _HoursLineState();
+}
+
+class _HoursLineState extends State<_HoursLine> {
+  String? _openUntil;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadHours();
+  }
+
+  Future<void> _loadHours() async {
+    try {
+      final detail = await fetchSpot(widget.spot.spotId);
+      if (!mounted) return;
+      setState(() => _openUntil = detail.openUntil);
+    } catch (_) {
+      // Hours are a nicety, not the point of the sheet — a failed lookup just
+      // leaves the line showing the category on its own.
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final label = widget.spot.type.label;
+
+    return Text(
+      _openUntil == null ? label : '$label · Until $_openUntil',
+      style: GoogleFonts.plusJakartaSans(
+        fontSize: 12.5,
+        fontWeight: FontWeight.w500,
+        color: Tone.muted,
       ),
     );
   }

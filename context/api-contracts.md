@@ -105,10 +105,14 @@ without a second request. This replaces today's `StudySpot` model in both client
   "score": 8.4,
   "ratings": { "wifi": 4, "noise": 5, "outlets": 4, "seating": 4, "coffee": 4 },
   "priceLevel": 2,
-  "thumbnailUrl": null,
+  "coffeeOrder": "Vanilla latte",
+  "notes": "Quiet back room with good lighting.",
   "updatedAt": "2026-07-25T18:03:11Z"
 }
 ```
+
+`coffeeOrder` and `notes` ride along so the detail sheet can open straight from a list
+row without a second request. (`thumbnailUrl` will join them when photos land in v3.)
 
 No `openUntil` here on purpose: it would cost a Places call per row. The detail sheet
 fetches it. If the list must show "open now", add `?includeHours=true` and accept the
@@ -143,8 +147,14 @@ latency, or cache hours server-side for a few minutes.
 | `GET` | `/spots/{id}` | Full `Spot`, including live hours and the caller's own entry as `myEntry`. |
 | `GET` | `/spots/{id}/entries` | Other users' entries for this spot, respecting visibility. Paginated. |
 
-Note what `POST /spots` does *not* accept: no name, address, hours, or ratings. A spot is
-created from a Place ID and nothing else. Ratings arrive separately, as an entry.
+`POST /spots` takes **either** `{ "googlePlaceId": "..." }` — the normal path — **or**
+`{ "name": "...", "address": "...", "type": "campus" }` for a place Google doesn't know
+about (decision D9). What it never accepts is ratings: those arrive separately as an
+entry, because they belong to one user and the spot belongs to everyone.
+
+When `Places:ApiKey` isn't configured, `GET /places/search` returns `503` with a
+problem+json explaining why. The Flutter sheet treats that as "switch to manual entry"
+rather than an error, so the add flow works with or without a Google key.
 
 ### My entries
 
@@ -185,22 +195,16 @@ optional; sending `null` clears them. `score` is rejected if present.
 | `POST` | `/spots/{spotId}/photos` | `multipart/form-data`, optional `entryId`. Returns the created photo. |
 | `DELETE` | `/photos/{id}` | Soft delete; uploader or spot owner only. |
 
-## What this breaks in the current clients
+## Client status
 
-Both frontends model a single flat `StudySpot`. That type splits in two.
+**Flutter — done.** `lib/models/spot.dart` replaced the old flat `StudySpot`, and
+`api_service.dart` was rewritten: the `Uri.https('localhost:5001', …)` call (https
+against a plaintext dev server) and the unawaited top-level `http.get` that fired at
+import time are both gone. The base URL now resolves to `10.0.2.2` on the Android
+emulator, which is the only address that reaches the host from there, and
+`--dart-define=API_BASE_URL=…` overrides it.
 
-**Flutter** (`lib/models/studyspot.dart`) — `StudySpot.fromJson` currently pattern-matches
-on `{'id': int, 'hasCharging': bool, 'seating': int, 'coffeeQuality': int, 'openUntil':
-String}` and throws `FormatException` on anything else. Every one of those five keys
-changes: `id` becomes a `String`, `hasCharging` becomes the `outlets` rating,
-`coffeeQuality` becomes `coffee`, and `openUntil` becomes nullable and moves to the
-detail response. Replace the model with `Spot`, `SpotEntry`, and `MySpotListItem`.
-
-`lib/services/api_service.dart` also has a live bug worth fixing in the same pass:
-`Uri.https('localhost:5001', 'studyspots')` requests **https** against a plaintext dev
-server, and the top-level `http.get(url)` at line 6 fires an unawaited request at import
-time. Use `Uri.http` (or a configurable base URL) and delete the module-level call.
-
-**Angular** (`frontend/src/services/study-spot.service.ts`) — the `StudySpot` interface
-splits the same way, and the `db.json` import with its `openUntil: new Date(spot.openUntil)`
-mapping goes away entirely; the API is the only source now.
+**Angular — broken, not yet updated.** `frontend/src/services/study-spot.service.ts`
+still calls `/studyspots`, which no longer exists. It needs the same split, and the
+`db.json` import with its `openUntil: new Date(spot.openUntil)` mapping should go; the
+API is the only source now.
