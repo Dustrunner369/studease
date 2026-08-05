@@ -1,3 +1,5 @@
+import 'package:firebase_core/firebase_core.dart';
+import 'package:mobile/firebase_options.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:mobile/features/study_spots/presentation/add_spot_sheet.dart';
@@ -5,7 +7,11 @@ import 'package:mobile/services/api_service.dart';
 import 'package:mobile/models/spot.dart';
 import 'package:mobile/design/theme.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
   runApp(const StudySpotApp());
 }
 
