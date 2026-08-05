@@ -170,7 +170,8 @@ app.MapGet("/me/spots", async (AppDbContext db, CancellationToken ct) =>
             e.Spot.FormattedAddress,
             e.Spot.Type,
             e.Score,
-            new RatingsDto(e.Wifi, e.Noise, e.Outlets, e.Seating, e.Coffee),
+            new RatingsDto(e.Wifi, e.Noise, e.Outlets, e.Seating, e.TableSize, e.Coffee),
+            e.GroupStudy,
             e.Spot.PriceLevel,
             e.CoffeeOrder,
             e.Notes,
@@ -225,7 +226,9 @@ app.MapPut("/spots/{id:guid}/entry", async (
     entry.Noise = request.Ratings.Noise;
     entry.Outlets = request.Ratings.Outlets;
     entry.Seating = request.Ratings.Seating;
+    entry.TableSize = request.Ratings.TableSize;
     entry.Coffee = request.Ratings.Coffee;
+    entry.GroupStudy = request.GroupStudy ?? false;
     entry.CoffeeOrder = Trimmed(request.CoffeeOrder);
     entry.Notes = Trimmed(request.Notes);
     entry.Visibility = visibility;
@@ -268,7 +271,7 @@ static Dictionary<string, string[]> ValidateRatings(RatingsDto? ratings)
 
     if (ratings is null)
     {
-        errors["ratings"] = ["All five ratings are required."];
+        errors["ratings"] = ["All six ratings are required."];
         return errors;
     }
 
@@ -281,6 +284,7 @@ static Dictionary<string, string[]> ValidateRatings(RatingsDto? ratings)
     Check("noise", ratings.Noise);
     Check("outlets", ratings.Outlets);
     Check("seating", ratings.Seating);
+    Check("tableSize", ratings.TableSize);
     Check("coffee", ratings.Coffee);
 
     return errors;
@@ -289,8 +293,10 @@ static Dictionary<string, string[]> ValidateRatings(RatingsDto? ratings)
 static SpotEntryDto ToEntryDto(SpotEntry entry) => new(
     entry.Id,
     entry.SpotId,
-    new RatingsDto(entry.Wifi, entry.Noise, entry.Outlets, entry.Seating, entry.Coffee),
+    new RatingsDto(
+        entry.Wifi, entry.Noise, entry.Outlets, entry.Seating, entry.TableSize, entry.Coffee),
     entry.Score,
+    entry.GroupStudy,
     entry.CoffeeOrder,
     entry.Notes,
     entry.Visibility,
@@ -341,7 +347,7 @@ static async Task RecomputeAggregates(AppDbContext db, Guid spotId, Cancellation
     {
         spot.EntryCount = 0;
         spot.AvgScore = spot.AvgWifi = spot.AvgNoise = null;
-        spot.AvgOutlets = spot.AvgSeating = spot.AvgCoffee = null;
+        spot.AvgOutlets = spot.AvgSeating = spot.AvgTableSize = spot.AvgCoffee = null;
     }
     else
     {
@@ -355,6 +361,7 @@ static async Task RecomputeAggregates(AppDbContext db, Guid spotId, Cancellation
                 Noise = g.Average(e => (decimal)e.Noise),
                 Outlets = g.Average(e => (decimal)e.Outlets),
                 Seating = g.Average(e => (decimal)e.Seating),
+                TableSize = g.Average(e => (decimal)e.TableSize),
                 Coffee = g.Average(e => (decimal)e.Coffee),
             })
             .SingleAsync(ct);
@@ -365,6 +372,7 @@ static async Task RecomputeAggregates(AppDbContext db, Guid spotId, Cancellation
         spot.AvgNoise = Math.Round(stats.Noise, 1);
         spot.AvgOutlets = Math.Round(stats.Outlets, 1);
         spot.AvgSeating = Math.Round(stats.Seating, 1);
+        spot.AvgTableSize = Math.Round(stats.TableSize, 1);
         spot.AvgCoffee = Math.Round(stats.Coffee, 1);
     }
 

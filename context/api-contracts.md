@@ -56,7 +56,7 @@ responses where a per-row lookup would be too expensive.
   "hoursUnavailable": false,
   "entryCount": 12,
   "avgScore": 8.4,
-  "avgRatings": { "wifi": 4.2, "noise": 3.8, "outlets": 4.5, "seating": 3.9, "coffee": 4.4 },
+  "avgRatings": { "wifi": 4.2, "noise": 3.8, "outlets": 4.5, "seating": 3.9, "tableSize": 4.1, "coffee": 4.4 },
   "photos": [ { "id": "018f...", "url": "https://...", "width": 1600, "height": 1200 } ]
 }
 ```
@@ -77,8 +77,9 @@ client.
   "id": "018f...",
   "spotId": "018f...",
   "user": { "id": "018f...", "handle": "matt", "displayName": "Matthew", "avatarUrl": null },
-  "ratings": { "wifi": 4, "noise": 5, "outlets": 4, "seating": 4, "coffee": 4 },
+  "ratings": { "wifi": 4, "noise": 5, "outlets": 4, "seating": 4, "tableSize": 4, "coffee": 4 },
   "score": 8.4,
+  "groupStudy": true,
   "coffeeOrder": "Vanilla latte",
   "notes": "Quiet back room with good lighting.",
   "visibility": "public",
@@ -88,7 +89,14 @@ client.
 }
 ```
 
-All five ratings are integers 1–5 and all are required. `noise: 5` means **quiet**.
+All six ratings are integers 1–5 and all are required. Every one reads "higher is
+better": `noise: 5` means **quiet**, and `tableSize: 5` means **big shared tables**.
+
+`score` is derived from **five** of them — wifi, noise, outlets, seating, coffee. It is
+`round((sum) * 0.4, 1)`, which puts five 1–5 ratings at exactly 10.0. `tableSize` is
+collected and displayed but deliberately left out: folding in a sixth term would rebase
+every score already stored. `groupStudy` is a boolean verdict, never scoreable, and stays
+one user's opinion — there is no group-study aggregate on `Spot`.
 
 ### `MySpotListItem`
 
@@ -103,7 +111,8 @@ without a second request. This replaces today's `StudySpot` model in both client
   "address": "123 Library Lane, Booktown",
   "type": "cafe",
   "score": 8.4,
-  "ratings": { "wifi": 4, "noise": 5, "outlets": 4, "seating": 4, "coffee": 4 },
+  "ratings": { "wifi": 4, "noise": 5, "outlets": 4, "seating": 4, "tableSize": 4, "coffee": 4 },
+  "groupStudy": true,
   "priceLevel": 2,
   "coffeeOrder": "Vanilla latte",
   "notes": "Quiet back room with good lighting.",
@@ -168,15 +177,19 @@ rather than an error, so the add flow works with or without a Google key.
 
 ```json
 {
-  "ratings": { "wifi": 4, "noise": 5, "outlets": 4, "seating": 4, "coffee": 4 },
+  "ratings": { "wifi": 4, "noise": 5, "outlets": 4, "seating": 4, "tableSize": 4, "coffee": 4 },
+  "groupStudy": true,
   "coffeeOrder": "Vanilla latte",
   "notes": "Quiet back room with good lighting.",
   "visibility": "public"
 }
 ```
 
-`ratings` is required and complete — all five, each 1–5. `coffeeOrder` and `notes` are
+`ratings` is required and complete — all six, each 1–5. `coffeeOrder` and `notes` are
 optional; sending `null` clears them. `score` is rejected if present.
+
+`groupStudy` is optional and defaults to `false`, so a client that predates the field
+still saves rather than getting a `400`.
 
 ### Social
 

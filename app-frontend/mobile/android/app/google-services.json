@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "219277229074",
+    "project_id": "swift-study-app",
+    "storage_bucket": "swift-study-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:219277229074:android:90a207550c127d0d75accb",
+        "android_client_info": {
+          "package_name": "com.example.mobile"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBDCUaMjte8qe8iCO0KLW4o7TsvXxVkMq4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

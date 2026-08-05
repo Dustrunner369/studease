@@ -3,7 +3,16 @@ namespace study_spot_backend.Dtos;
 // Wire shapes. See context/api-contracts.md — these are the contract the Flutter and
 // Angular clients are written against, so changing one is a breaking change.
 
-public record RatingsDto(short Wifi, short Noise, short Outlets, short Seating, short Coffee);
+// All six are 1-5 and all read "higher is better" — including Noise (5 = quiet) and
+// TableSize (5 = big shared tables). TableSize is rated but excluded from Score; see
+// SpotEntry.ComputeScore.
+public record RatingsDto(
+    short Wifi,
+    short Noise,
+    short Outlets,
+    short Seating,
+    short TableSize,
+    short Coffee);
 
 public record PlaceSuggestionDto(string GooglePlaceId, string Name, string Address);
 
@@ -15,8 +24,11 @@ public record CreateSpotRequest(
     string? Address,
     string? Type);
 
+// GroupStudy is nullable on the way in only so an older client that omits it gets a
+// default of false rather than a 400. Ratings stay required and complete.
 public record UpsertEntryRequest(
     RatingsDto Ratings,
+    bool? GroupStudy,
     string? CoffeeOrder,
     string? Notes,
     string? Visibility);
@@ -26,6 +38,7 @@ public record SpotEntryDto(
     Guid SpotId,
     RatingsDto Ratings,
     decimal Score,
+    bool GroupStudy,
     string? CoffeeOrder,
     string? Notes,
     string Visibility,
@@ -42,6 +55,7 @@ public record MySpotListItemDto(
     string Type,
     decimal Score,
     RatingsDto Ratings,
+    bool GroupStudy,
     short? PriceLevel,
     string? CoffeeOrder,
     string? Notes,

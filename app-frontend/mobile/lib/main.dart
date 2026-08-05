@@ -53,6 +53,7 @@ extension SpotPresentation on MySpotListItem {
         (Icons.volume_off, 'Quiet', levelFor(ratings.noise)),
         (Icons.bolt, 'Outlets', levelFor(ratings.outlets)),
         (Icons.event_seat, 'Seating', levelFor(ratings.seating)),
+        (Icons.table_restaurant, 'Tables', levelFor(ratings.tableSize)),
         (Icons.local_cafe, 'Coffee', levelFor(ratings.coffee)),
       ];
 
@@ -587,15 +588,23 @@ class SpotRow extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 6),
-                  Row(
+                  // Wrap, not Row: six rating icons plus the group marker overflow a
+                  // fixed row once the name column narrows on a 320px screen.
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 4,
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
-                      for (final (icon, label, level) in spot.amenities) ...[
+                      for (final (icon, label, level) in spot.amenities)
                         Tooltip(
                           message: '$label: ${level.display}',
                           child: Icon(icon, size: 14, color: level.color),
                         ),
-                        const SizedBox(width: 8),
-                      ],
+                      if (spot.groupStudy)
+                        const Tooltip(
+                          message: 'Good for group study',
+                          child: Icon(Icons.groups, size: 14, color: Tone.teal),
+                        ),
                     ],
                   ),
                 ],
@@ -786,6 +795,35 @@ class SpotDetailSheet extends StatelessWidget {
                       ],
                     ),
                   ),
+                // Sits with the ratings but renders differently on purpose — it's a
+                // yes/no, so it gets no 1-5 dot and no Level colour ramp.
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.groups, size: 19, color: Tone.muted),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'Group study',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 14.5,
+                            fontWeight: FontWeight.w600,
+                            color: Tone.ink,
+                          ),
+                        ),
+                      ),
+                      Text(
+                        spot.groupStudy ? 'Works' : 'Not really',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w700,
+                          color: spot.groupStudy ? Tone.teal : Tone.muted,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
                 if (spot.details.isNotEmpty) ...[
                   const SizedBox(height: 10),
                   Text(

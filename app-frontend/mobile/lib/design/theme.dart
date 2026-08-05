@@ -31,7 +31,8 @@ enum Level {
 }
 
 /// Buckets a 1-5 rating for display. Every rating reads "higher is better", so this
-/// works for all five categories — including noise, where 5 means quiet.
+/// works for all six categories — including noise, where 5 means quiet, and table size,
+/// where 5 means big shared tables.
 Level levelFor(int rating) {
   if (rating >= 4) return Level.good;
   if (rating >= 3) return Level.ok;

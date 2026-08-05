@@ -52,6 +52,7 @@ namespace study_spot_backend
                 entity.Property(s => s.AvgNoise).HasColumnType("numeric(2,1)");
                 entity.Property(s => s.AvgOutlets).HasColumnType("numeric(2,1)");
                 entity.Property(s => s.AvgSeating).HasColumnType("numeric(2,1)");
+                entity.Property(s => s.AvgTableSize).HasColumnType("numeric(2,1)");
                 entity.Property(s => s.AvgCoffee).HasColumnType("numeric(2,1)");
 
                 entity.HasOne<User>()
@@ -84,6 +85,11 @@ namespace study_spot_backend
 
                 // Postgres computes the score on every write, so it can never drift
                 // from the ratings it's derived from.
+                //
+                // table_size is rated but NOT part of this expression. The 0.4 puts five
+                // 1-5 ratings at exactly 10.0; adding a sixth term would mean dropping and
+                // recreating this generated column and rebasing every score already
+                // stored. If that trade is ever worth making, the divisor becomes 3.0.
                 entity.Property(e => e.Score)
                     .HasColumnType("numeric(3,1)")
                     .HasComputedColumnSql(
@@ -110,6 +116,7 @@ namespace study_spot_backend
                     t.HasCheckConstraint("ck_spot_entries_noise_range", "noise BETWEEN 1 AND 5");
                     t.HasCheckConstraint("ck_spot_entries_outlets_range", "outlets BETWEEN 1 AND 5");
                     t.HasCheckConstraint("ck_spot_entries_seating_range", "seating BETWEEN 1 AND 5");
+                    t.HasCheckConstraint("ck_spot_entries_table_size_range", "table_size BETWEEN 1 AND 5");
                     t.HasCheckConstraint("ck_spot_entries_coffee_range", "coffee BETWEEN 1 AND 5");
                 });
             });

@@ -44,7 +44,9 @@ erDiagram
         int noise
         int outlets
         int seating
+        int table_size
         int coffee
+        bool group_study
         numeric score "generated"
         text coffee_order
         text notes
@@ -111,29 +113,40 @@ One row per real-world place. **Globally shared** — not owned by whoever added
 - `type` is `cafe | library | campus | other`, mapping to `SpotType` in
   `lib/design/theme.dart`. Derived from the Places `types` array at creation, then
   editable — Google's categories don't cleanly express "campus study room".
-- `entry_count`, `avg_score`, and `avg_wifi`…`avg_coffee` are **cached aggregates**.
-  They are derived data, recomputed when an entry is written. Never treat them as the
-  source of truth; `spot_entries` is.
+- `entry_count`, `avg_score`, and `avg_wifi`…`avg_coffee` — which includes
+  `avg_table_size` — are **cached aggregates**. They are derived data, recomputed when an
+  entry is written. Never treat them as the source of truth; `spot_entries` is. There is
+  no cached column for `group_study`; see `spot_entries` below.
 
 ### `spot_entries`
 
 The heart of the app. One row per (user, spot) — enforced by `UNIQUE (user_id, spot_id)`.
 Rating a spot you've already rated is an **update**, not an insert (D2).
 
-Five required 1–5 ratings:
+Six required 1–5 ratings:
 
-| Column | 1 means | 5 means |
-| --- | --- | --- |
-| `wifi` | unusable or none | fast and reliable |
-| `noise` | **loud** | **quiet** |
-| `outlets` | no outlets | outlet at every seat |
-| `seating` | never a free table | always somewhere to sit |
-| `coffee` | bad | excellent |
+| Column | 1 means | 5 means | Scored |
+| --- | --- | --- | --- |
+| `wifi` | unusable or none | fast and reliable | yes |
+| `noise` | **loud** | **quiet** | yes |
+| `outlets` | no outlets | outlet at every seat | yes |
+| `seating` | never a free table | always somewhere to sit | yes |
+| `table_size` | cramped two-tops only | big shared tables, room to spread out | **no** |
+| `coffee` | bad | excellent | yes |
 
 > **`noise` is inverted on purpose.** 5 = quietest. Every category must be
 > "higher is better" or the score formula and the green/amber/coral `Level` colors in
 > `theme.dart` silently mean the opposite of what they show. If you ever add a category
 > where high is bad (crowdedness, price), store it inverted too.
+
+> **`table_size` is rated but not scored.** It's collected, displayed, and averaged into
+> `avg_table_size` like any other rating, but it is absent from the generated `score`
+> expression below. See "Entry score" for why.
+
+`group_study` is a required boolean, defaulting to `false`: does this place work for
+studying with other people? It is **one user's verdict, not a fact about the place** —
+two people can disagree about the same spot, and that's the point. There is deliberately
+no group-study aggregate on `spots`.
 
 `coffee_order` and `notes` are optional free text (D6) — purely for your own recall,
 never validated, never parsed.
@@ -206,6 +219,13 @@ score = ROUND((wifi + noise + outlets + seating + coffee) * 0.4, 1)
 Equal weights, sum of 5..25 mapped onto **2.0–10.0**. The floor is 2.0, not 0.0: a spot
 you bothered to rate at all is never a zero, and the `scoreColor` thresholds in
 `theme.dart` (9.0 / 8.0 / 7.0) already assume the interesting range is the top half.
+
+**`table_size` is not in this expression**, even though it's a required 1–5 rating. The
+`0.4` is what maps five ratings onto a 10-point ceiling; a sixth term needs `/ 3.0`
+instead, which changes the number every existing entry scores. Adding the column was
+worth doing on its own, rebasing everyone's scores was not. If that trade is ever worth
+making, it's a `DROP` and re-`ADD` of the generated column in a migration — you cannot
+`ALTER` a generated expression in place.
 
 To weight categories later, change the expression and add a migration — do *not* start
 computing it client-side.

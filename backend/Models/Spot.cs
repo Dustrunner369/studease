@@ -68,7 +68,11 @@ public class Spot : ITimestamped
     public decimal? AvgNoise { get; set; }
     public decimal? AvgOutlets { get; set; }
     public decimal? AvgSeating { get; set; }
+    public decimal? AvgTableSize { get; set; }
     public decimal? AvgCoffee { get; set; }
+
+    // NOTE: no group-study aggregate. GroupStudy stays one user's verdict on their own
+    // entry; rolling it up into "8 of 12 say group-friendly" is a deliberate non-goal.
 
     // NOTE: deliberately no opening-hours columns. Hours are fetched live from the
     // Places API when a spot is rendered (decision D8 in context/README.md).

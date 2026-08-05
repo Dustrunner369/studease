@@ -96,6 +96,7 @@ Future<SpotDetail> createSpot({
 Future<SpotEntry> saveEntry({
   required String spotId,
   required Ratings ratings,
+  bool groupStudy = false,
   String? coffeeOrder,
   String? notes,
 }) async {
@@ -104,6 +105,7 @@ Future<SpotEntry> saveEntry({
         headers: _jsonHeaders,
         body: json.encode({
           'ratings': ratings.toJson(),
+          'groupStudy': groupStudy,
           'coffeeOrder': coffeeOrder,
           'notes': notes,
         }),

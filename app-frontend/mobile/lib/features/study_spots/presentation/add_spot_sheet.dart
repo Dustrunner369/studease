@@ -47,7 +47,12 @@ class _AddSpotSheetState extends State<AddSpotSheet> {
   int? _quiet;
   int? _outlets;
   int? _seating;
+  int? _tableSize;
   int? _coffee;
+
+  // A yes/no, so it starts answered rather than null — unlike the six ratings, leaving
+  // it alone is a valid "no" and shouldn't block saving.
+  bool _groupStudy = false;
 
   bool _saving = false;
   String? _error;
@@ -81,6 +86,7 @@ class _AddSpotSheetState extends State<AddSpotSheet> {
       _quiet != null &&
       _outlets != null &&
       _seating != null &&
+      _tableSize != null &&
       _coffee != null;
 
   bool get _canSave => _hasPlace && _hasAllRatings && !_saving;
@@ -164,8 +170,10 @@ class _AddSpotSheetState extends State<AddSpotSheet> {
           noise: _quiet!,
           outlets: _outlets!,
           seating: _seating!,
+          tableSize: _tableSize!,
           coffee: _coffee!,
         ),
+        groupStudy: _groupStudy,
         coffeeOrder: _trimmedOrNull(_orderController),
         notes: _trimmedOrNull(_notesController),
       );
@@ -252,10 +260,23 @@ class _AddSpotSheetState extends State<AddSpotSheet> {
                           onChanged: (v) => setState(() => _seating = v),
                         ),
                         _RatingRow(
+                          icon: Icons.table_restaurant,
+                          label: 'Table size',
+                          value: _tableSize,
+                          onChanged: (v) => setState(() => _tableSize = v),
+                        ),
+                        _RatingRow(
                           icon: Icons.local_cafe,
                           label: 'Coffee',
                           value: _coffee,
                           onChanged: (v) => setState(() => _coffee = v),
+                        ),
+                        const SizedBox(height: 22),
+                        _buildSectionLabel('GROUP STUDY'),
+                        const SizedBox(height: 4),
+                        _GroupStudyToggle(
+                          value: _groupStudy,
+                          onChanged: (v) => setState(() => _groupStudy = v),
                         ),
                         const SizedBox(height: 22),
                         _buildSectionLabel('USUAL ORDER'),
@@ -596,7 +617,7 @@ class _AddSpotSheetState extends State<AddSpotSheet> {
             Padding(
               padding: const EdgeInsets.only(bottom: 8),
               child: Text(
-                'Rate all five to save',
+                'Rate all six to save',
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: 12.5,
                   fontWeight: FontWeight.w500,
@@ -636,6 +657,63 @@ class _AddSpotSheetState extends State<AddSpotSheet> {
               ),
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Whether the spot works for studying with other people.
+///
+/// A two-option segmented control rather than a Switch: a switch reads as a setting you
+/// flip, and defaults to "off" ambiguously, where this is an answer with two sides.
+class _GroupStudyToggle extends StatelessWidget {
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  const _GroupStudyToggle({required this.value, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 9),
+      child: Row(
+        children: [
+          const Icon(Icons.groups, size: 19, color: Tone.muted),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              'Good with a group',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 14.5,
+                fontWeight: FontWeight.w600,
+                color: Tone.ink,
+              ),
+            ),
+          ),
+          for (final (label, isYes) in const [('No', false), ('Yes', true)])
+            GestureDetector(
+              onTap: () => onChanged(isYes),
+              behavior: HitTestBehavior.opaque,
+              child: Padding(
+                padding: const EdgeInsets.only(left: 6),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                  decoration: BoxDecoration(
+                    color: value == isYes ? Tone.ink : Tone.field,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    label,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: value == isYes ? Colors.white : Tone.muted,
+                    ),
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );

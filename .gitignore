@@ -30,4 +30,6 @@ Thumbs.db
 # Postgres data
 pgdata/
 
+.claude/worktrees/
+
 .impeccable.md

@@ -84,7 +84,9 @@ CREATE TABLE spots (
     avg_noise         numeric(2,1),
     avg_outlets       numeric(2,1),
     avg_seating       numeric(2,1),
+    avg_table_size    numeric(2,1),
     avg_coffee        numeric(2,1),
+    -- No avg_group_study on purpose: it stays one user's verdict, never rolled up.
 
     -- NOTE: deliberately no opening-hours column. Hours are fetched live from the
     -- Places API at render time (decision D8).
@@ -115,16 +117,27 @@ CREATE TABLE spot_entries (
     user_id      uuid        NOT NULL REFERENCES users (id) ON DELETE CASCADE,
     spot_id      uuid        NOT NULL REFERENCES spots (id) ON DELETE CASCADE,
 
-    -- Five required ratings, 1-5, ALL "higher is better".
-    -- noise: 5 = quiet. Inverted on purpose — see data-model.md.
+    -- Six required ratings, 1-5, ALL "higher is better".
+    -- noise:      5 = quiet. Inverted on purpose — see data-model.md.
+    -- table_size: 5 = big shared tables you can spread out on.
     wifi         smallint    NOT NULL,
     noise        smallint    NOT NULL,
     outlets      smallint    NOT NULL,
     seating      smallint    NOT NULL,
+    table_size   smallint    NOT NULL,
     coffee       smallint    NOT NULL,
+
+    -- Does this place work for studying with other people? One user's verdict, not a
+    -- fact about the place — two people may disagree about the same spot.
+    group_study  boolean     NOT NULL DEFAULT false,
 
     -- 0-10 score, computed by the database so all three clients agree.
     -- Sum of 5..25 maps onto 2.0..10.0.
+    --
+    -- table_size is rated but deliberately absent here: the 0.4 is what maps FIVE
+    -- ratings onto a 10-point ceiling, and a sixth term (divisor 3.0 instead) would
+    -- rebase every score already stored. Changing this means DROP and re-ADD of the
+    -- column — a generated expression cannot be ALTERed in place.
     score        numeric(3,1) GENERATED ALWAYS AS
                      (ROUND((wifi + noise + outlets + seating + coffee) * 0.4, 1)) STORED,
 
@@ -146,6 +159,7 @@ CREATE TABLE spot_entries (
     CONSTRAINT spot_entries_noise_range   CHECK (noise   BETWEEN 1 AND 5),
     CONSTRAINT spot_entries_outlets_range CHECK (outlets BETWEEN 1 AND 5),
     CONSTRAINT spot_entries_seating_range CHECK (seating BETWEEN 1 AND 5),
+    CONSTRAINT spot_entries_table_size_range CHECK (table_size BETWEEN 1 AND 5),
     CONSTRAINT spot_entries_coffee_range  CHECK (coffee  BETWEEN 1 AND 5)
 );
 

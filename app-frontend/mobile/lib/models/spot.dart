@@ -1,14 +1,20 @@
 import 'package:mobile/design/theme.dart';
 
-/// The five 1-5 ratings that make up a spot entry.
+/// The six 1-5 ratings that make up a spot entry.
 ///
-/// All of them read "higher is better" — including [noise], where 5 means *quiet*.
+/// All of them read "higher is better" — including [noise], where 5 means *quiet*, and
+/// [tableSize], where 5 means big shared tables you can spread out on.
 /// See context/data-model.md if that ever looks like a bug.
+///
+/// [tableSize] is rated but does *not* feed the score: the server's generated column
+/// covers the original five only, so a spot's score can't move just because table size
+/// was added.
 class Ratings {
   final int wifi;
   final int noise;
   final int outlets;
   final int seating;
+  final int tableSize;
   final int coffee;
 
   const Ratings({
@@ -16,6 +22,7 @@ class Ratings {
     required this.noise,
     required this.outlets,
     required this.seating,
+    required this.tableSize,
     required this.coffee,
   });
 
@@ -24,6 +31,7 @@ class Ratings {
         noise: (json['noise'] as num).toInt(),
         outlets: (json['outlets'] as num).toInt(),
         seating: (json['seating'] as num).toInt(),
+        tableSize: (json['tableSize'] as num).toInt(),
         coffee: (json['coffee'] as num).toInt(),
       );
 
@@ -32,6 +40,7 @@ class Ratings {
         'noise': noise,
         'outlets': outlets,
         'seating': seating,
+        'tableSize': tableSize,
         'coffee': coffee,
       };
 }
@@ -45,6 +54,10 @@ class MySpotListItem {
   final SpotType type;
   final double score;
   final Ratings ratings;
+
+  /// My verdict on whether this place works for studying with other people. One user's
+  /// opinion, not a fact about the place — the server stores it per entry.
+  final bool groupStudy;
   final int? priceLevel;
   final String? coffeeOrder;
   final String? notes;
@@ -58,6 +71,7 @@ class MySpotListItem {
     required this.type,
     required this.score,
     required this.ratings,
+    required this.groupStudy,
     required this.priceLevel,
     required this.coffeeOrder,
     required this.notes,
@@ -72,6 +86,7 @@ class MySpotListItem {
         type: spotTypeFromApi(json['type'] as String?),
         score: (json['score'] as num).toDouble(),
         ratings: Ratings.fromJson(json['ratings'] as Map<String, dynamic>),
+        groupStudy: json['groupStudy'] as bool? ?? false,
         priceLevel: (json['priceLevel'] as num?)?.toInt(),
         coffeeOrder: json['coffeeOrder'] as String?,
         notes: json['notes'] as String?,
@@ -85,6 +100,7 @@ class SpotEntry {
   final String spotId;
   final Ratings ratings;
   final double score;
+  final bool groupStudy;
   final String? coffeeOrder;
   final String? notes;
 
@@ -93,6 +109,7 @@ class SpotEntry {
     required this.spotId,
     required this.ratings,
     required this.score,
+    required this.groupStudy,
     required this.coffeeOrder,
     required this.notes,
   });
@@ -102,6 +119,7 @@ class SpotEntry {
         spotId: json['spotId'] as String,
         ratings: Ratings.fromJson(json['ratings'] as Map<String, dynamic>),
         score: (json['score'] as num).toDouble(),
+        groupStudy: json['groupStudy'] as bool? ?? false,
         coffeeOrder: json['coffeeOrder'] as String?,
         notes: json['notes'] as String?,
       );
