@@ -6,6 +6,10 @@ This is a **plan, not a record** — nothing here is built yet. It resolves "Sti
 in [README.md](README.md). See [data-model.md](data-model.md) for the `users` table and
 [api-contracts.md](api-contracts.md) for the wire shapes it plugs into.
 
+> **Decided (2026-08-06): Firebase Auth, with email/password and Google Sign-In.**
+> Sign in with Apple is **not** in scope — see [Apple is out of scope](#apple-is-out-of-scope)
+> for the App Store condition that would force a revisit.
+
 ## Where we are today
 
 `AppDbContext.DevUserId` (`00000000-0000-0000-0000-0000000000d5`) is hardcoded in
@@ -22,14 +26,17 @@ in place and waiting.
 So this isn't a design from scratch. It's implementing a contract that's already written,
 plus the one piece that contract doesn't cover: **where the token comes from**.
 
-## Decision A1 — Firebase Authentication
+## Decision A1 — Firebase Authentication ✅
 
-**Recommendation: Firebase Auth.** The API validates Firebase-issued ID tokens as ordinary
-OIDC JWTs and stores `auth_provider = 'firebase'`, `auth_subject = <firebase uid>`.
+**Decided: Firebase Auth**, with **email/password and Google Sign-In** as the two providers
+at launch. The API validates Firebase-issued ID tokens as ordinary OIDC JWTs and stores
+`auth_provider = 'firebase'`, `auth_subject = <firebase uid>`.
+
+The table below is kept as the record of what was weighed, not as a live question.
 
 | Option | Flutter DX | Backend work | Cost | Verdict |
 | --- | --- | --- | --- | --- |
-| **Firebase Auth** | First-class. `firebase_auth` handles Google, Apple, email/password, refresh, persistence | One `AddJwtBearer` block | Free to 50k MAU | **Pick this** |
+| **Firebase Auth** | First-class. `firebase_auth` handles Google, Apple, email/password, refresh, persistence | One `AddJwtBearer` block | Free to 50k MAU | **Chosen** |
 | Auth0 | Good (`auth0_flutter`), but you wire the callback scheme yourself | Same `AddJwtBearer` block | Free to 25k MAU | Fine alternative; more setup, better if you later need enterprise SSO |
 | Supabase Auth | Decent SDK | Same, HS256 shared secret | Free tier | Drags in a second Postgres you don't need. No |
 | ASP.NET Core Identity | You build every screen | You own password hashing, email verification, reset emails, refresh-token rotation, revocation | Free | **No** — see below |
@@ -60,7 +67,7 @@ The lock-in is shallow either way: everything below depends on *"a bearer JWT wi
 
 This is the part that needs deciding before any code is written.
 
-A valid Firebase token proves *someone owns an email or an Apple/Google account*. It does
+A valid Firebase token proves *someone owns an email address or a Google account*. It does
 not produce a `handle` or a `displayName`, and both are `required` and `NOT NULL` on
 `users`, with `handle` additionally unique. So a first-time caller arrives holding a
 perfectly valid token for which **no `users` row can be auto-created**.
@@ -75,8 +82,8 @@ Two ways out:
    row with a handle the user picked.
 
 **Take option 2.** Handles are public and permanent-ish in a social app — people should
-choose them. It also makes the client's state machine honest, and it sidesteps a genuine
-Apple gotcha (below) for free.
+choose them. It also makes the client's state machine honest, and it keeps the door open to
+adding Apple later without redesigning onboarding (see below).
 
 So every client is in exactly one of three states:
 
@@ -89,16 +96,43 @@ So every client is in exactly one of three states:
 The middle state is the one that gets forgotten and then causes a blank screen on a fresh
 install. Model it explicitly from the start.
 
-### The Apple gotcha this happens to solve
+### Apple is out of scope
 
-Sign in with Apple returns the user's name **only on the very first authorization, ever** —
-reinstall the app, sign in again, and `givenName`/`familyName` come back null. Apps that
-auto-provision a display name from the Apple payload get one shot at it. Because we ask for
-the display name in onboarding, we never depend on that field.
+**Decided: email/password and Google only.** Sign in with Apple is not being built.
 
-Related: Apple's "Hide My Email" gives you a `@privaterelay.appleid.com` proxy address. It's
-a real, deliverable address, but it isn't the person's email. `users.email` is nullable and
-is **display/convenience only** — never a lookup key, never a merge key.
+Nothing in the design depends on that choice — `(auth_provider, auth_subject)` treats every
+Firebase provider identically, and adding Apple later is one provider call in the client
+plus a capability in Xcode. It is a deferral, not a door closing.
+
+**The one condition that forces a revisit: shipping to the iOS App Store.** Guideline 4.8
+says an app that offers a third-party or social login for the *primary* account must also
+offer an alternative that limits collection to name and email, **lets the user keep their
+email address private**, and doesn't collect interactions for advertising without consent.
+Sign in with Apple satisfies this by construction. Whether a plain email/password signup
+satisfies it is genuinely unsettled — it collects only an email, but it offers no masking
+equivalent to Apple's relay, and reviewers are inconsistent on whether that counts.
+
+So this is a **live risk carried knowingly**, not a solved problem:
+
+- **Android-only, or TestFlight-internal** → no exposure. 4.8 is enforced at App Store review.
+- **Public App Store release with Google sign-in enabled** → assume Apple may be required.
+  Budget the $99/yr developer account and roughly a day of work, and don't discover it in
+  the rejection email.
+
+Two Apple-specific facts worth keeping, because they're expensive to learn late and they
+shape onboarding if Apple is ever added:
+
+- Sign in with Apple returns the user's name **only on the very first authorization, ever**.
+  Reinstall and sign in again and `givenName`/`familyName` come back null. Apps that
+  auto-provision a display name from that payload get exactly one shot at it. Asking for the
+  display name in onboarding (decision A2 above) means we never depend on it — which is why
+  A2 is worth keeping even though Apple is out today.
+- "Hide My Email" hands out `@privaterelay.appleid.com` proxy addresses — real and
+  deliverable, but not the person's email.
+
+That second point generalises past Apple and holds right now: `users.email` is nullable and
+is **display/convenience only** — never a lookup key, never a merge key. Google account
+emails change too.
 
 ## Wire contract
 
@@ -282,15 +316,22 @@ The project ID is not a secret. It ships in the client anyway.
 ### Packages
 
 ```yaml
-firebase_core: ^4.x
-firebase_auth: ^6.x
-google_sign_in: ^7.x
-sign_in_with_apple: ^7.x   # required by App Store guideline 4.8 if you ship Google sign-in
+firebase_core: ^4.13.0   # already added
+firebase_auth: ^6.5.7    # already added
+google_sign_in: ^7.x     # still to add
 ```
+
+No `sign_in_with_apple` — see [Apple is out of scope](#apple-is-out-of-scope). Add it only
+if App Store review forces the issue.
 
 Pin the versions `flutter pub add` actually resolves — the Firebase plugins move fast and
 must be mutually compatible; take whatever `firebase_core` pulls in rather than pinning by
 hand.
+
+> **`google_sign_in` 7.x is a breaking rewrite.** The old `GoogleSignIn()` constructor plus
+> `signIn()` is gone, replaced by an `initialize()` call and `authenticate()`. Most tutorials
+> and most model-generated snippets are still 6.x and will not compile. Read the migration
+> notes before writing the provider call, not after.
 
 **Not** `flutter_secure_storage`. `firebase_auth` already persists the refresh token in the
 keychain/keystore and refreshes the ID token in the background. Storing tokens yourself
@@ -351,8 +392,8 @@ bool get needsRegistration => statusCode == 403;  // match on the problem `type`
 
 Four new surfaces, all currently missing:
 
-1. **Sign in** — Continue with Google / Continue with Apple / email + password, plus a link
-   to sign up and one to reset the password.
+1. **Sign in** — Continue with Google, and email + password, plus a link to sign up and one
+   to reset the password. No Apple button.
 2. **Sign up (email)** — email, password, confirm. Firebase enforces password strength; show
    its error messages rather than inventing your own rules.
 3. **Choose your handle** — handle + display name, with live availability from
@@ -368,15 +409,38 @@ re-authentication prompt. That's expected; handle it rather than swallowing it.
 
 ### Platform configuration
 
-| Platform | Needed |
-| --- | --- |
-| Android | `google-services.json` in `android/app/`, Gradle plugin, **debug and release SHA-1 fingerprints registered in the Firebase console** — Google sign-in fails silently without them |
-| iOS | `GoogleService-Info.plist`, reversed-client-id URL scheme in `Info.plist`, Sign in with Apple capability, a paid Apple Developer account |
-| Emulator | The Android emulator image must include Play Services or Google sign-in won't launch. `10.0.2.2` (`api_service.dart:18`) still reaches the host API — Firebase itself goes over the public internet and is unaffected |
+`flutterfire configure` has already run. `lib/firebase_options.dart`,
+`android/app/google-services.json` and `ios/Runner/GoogleService-Info.plist` all exist and
+are committed, and `main.dart` initialises with `DefaultFirebaseOptions.currentPlatform`.
+**Email/password will work today on both platforms with no further setup** — the options are
+passed from Dart, so nothing reads the native config files at launch.
 
-`google-services.json` and `GoogleService-Info.plist` are **not secrets** (they're extracted
-from any shipped app), so committing them is normal. Check `.gitignore` doesn't already
-exclude them by pattern.
+Google Sign-In is what needs the rest. Verified state as of 2026-08-06:
+
+| Platform | Needed | State |
+| --- | --- | --- |
+| Android | `google-services.json`, Gradle plugin, **debug and release SHA-1 fingerprints in the Firebase console** — Google sign-in fails silently without them | File present; SHA-1s **not yet registered** |
+| iOS | `GoogleService-Info.plist` **referenced by the Xcode project**, and its `REVERSED_CLIENT_ID` registered as a URL scheme in `Info.plist` | File on disk but **not in `project.pbxproj`**, so it isn't bundled. No `REVERSED_CLIENT_ID` in it, and no `CFBundleURLTypes` in `Info.plist` |
+| Both | A real bundle/application ID | Still `com.example.mobile` — the Flutter placeholder, also baked into `firebase_options.dart` as `iosBundleId` |
+| Emulator | The Android emulator image must include Play Services or Google sign-in won't launch. `10.0.2.2` (`api_service.dart:18`) still reaches the host API — Firebase itself goes over the public internet and is unaffected | — |
+
+Three consequences worth reading twice:
+
+1. **The plist has no `REVERSED_CLIENT_ID` because Google isn't enabled as a provider yet.**
+   Enabling it in the Firebase console creates the OAuth client and changes the file —
+   re-download it afterwards, don't hand-edit.
+2. **Fix the bundle ID before anything depends on it.** Firebase apps are keyed by bundle ID,
+   so changing it later means registering a new iOS app and regenerating both the plist and
+   `firebase_options.dart`. `com.example.*` also can't be registered to an Apple Developer
+   account, which matters the moment an App Store build is on the table.
+3. **Android SHA-1 registration is the classic silent failure.** Google sign-in returns a
+   generic cancellation with no useful error when the fingerprint is missing. Register the
+   debug keystore's SHA-1 *and* the release one.
+
+`google-services.json` and `GoogleService-Info.plist` are **not secrets** — they're extracted
+from any shipped app — so committing them is normal, and all three files are already tracked.
+The `apiKey` inside them is a client identifier, not a credential; restrict it by bundle ID
+in the Google Cloud console so it can't be reused from another app.
 
 ## Angular
 
@@ -413,8 +477,10 @@ time.
 
 Each phase leaves the app working.
 
-**Phase 0 — decide.** Answer the open questions below. Create the Firebase project, enable
-Google, Apple, and Email/Password providers.
+**Phase 0 — decide.** ✅ Provider decided (Firebase, email/password + Google). The Firebase
+project `swift-study-app` exists and `flutterfire configure` has run. Remaining: enable the
+**Email/Password** and **Google** providers in the console, set the one-account-per-email
+setting (see Gotchas), and answer the open questions below.
 
 **Phase 1 — backend accepts tokens.** JwtBearer, `CurrentUser`, `AddHttpContextAccessor`,
 dev bypass on. Replace every `currentUserId` reference. Nothing else changes: with the
@@ -426,12 +492,17 @@ still works untouched and a real Firebase token also authenticates.*
 handle format check. *Done when a fresh identity can register over curl and immediately
 read `/me/spots`.*
 
-**Phase 3 — Flutter signs in.** `firebase_core` + `firebase_auth`, `AuthController`, auth
-gate, sign-in screen, token attachment and 401 retry in `api_service.dart`. Email/password
-only — one provider at a time. *Done when you sign in on a device and see your spots.*
+**Phase 3 — Flutter signs in.** `firebase_core` + `firebase_auth` (both already added),
+`AuthController`, auth gate, sign-in screen, token attachment and 401 retry in
+`api_service.dart`. **Email/password only** — one provider at a time, and this one needs no
+native configuration. *Done when you sign in on a device and see your spots.*
 
-**Phase 4 — the rest of the client.** Onboarding screen, Google and Apple providers,
-Profile tab, sign out, password reset.
+**Phase 4 — Google Sign-In and the rest of the client.** Enable the Google provider,
+re-download `GoogleService-Info.plist`, wire it into the Xcode target, add the URL scheme,
+register the Android SHA-1s, fix the bundle ID, then add `google_sign_in`. Plus the
+onboarding screen, Profile tab, sign out, and password reset. *Done when Google sign-in works
+on a real Android device and a real iPhone — the simulator hides SHA-1 and URL-scheme
+problems.*
 
 **Phase 5 — harden.** Bypass off in every non-development configuration, rate limits,
 `DELETE /me`, production CORS origins, and the dev-user data decision above.
@@ -467,14 +538,26 @@ filter.
 change your mind — it's the login key, and rewriting it means every existing user is a
 stranger.
 
-**Don't key on email.** People change emails, Apple hands out relay addresses, and two
-providers can hand you the same address for different accounts. `(auth_provider,
-auth_subject)` is the key; the schema already says so.
+**Don't key on email.** People change emails, and two providers can hand you the same address
+for different accounts. `(auth_provider, auth_subject)` is the key; the schema already says
+so.
 
-**Account linking is out of scope.** Sign in with Google, then later with Apple on the same
-email, and Firebase gives you two uids — so two `users` rows, two handles, and one confused
-person. Firebase's "one account per email address" setting mitigates it. Decide it now,
-knowingly, rather than discovering it from a support message.
+**Account collision is now the most likely real-world bug**, and choosing email/password +
+Google is exactly what creates it. Someone registers with `matt@gmail.com` and a password,
+comes back a month later, taps "Continue with Google", and picks the same Gmail account.
+Firebase's default is **"one account per email address"**, which makes the second attempt
+throw `account-exists-with-different-credential` rather than silently creating a second
+identity — so the default is the one you want. Confirm it is actually set in the console
+during Phase 0.
+
+Handle that error rather than showing a generic failure: the honest message is *"You already
+have an account with this email — sign in with your password, then link Google from your
+profile."* Actual credential linking (`linkWithCredential`) is **out of scope for v1**; the
+error message is the whole feature for now.
+
+If the setting were ever turned off, you'd get two uids for one human — two `users` rows, two
+handles, one confused person, and no way to merge them without a migration you haven't
+written.
 
 **Startup migration + auth is a bad combination.** `Program.cs:46` runs `db.Database.Migrate()`
 on every boot, with a comment already flagging it as a foot-gun. Once real accounts exist,
@@ -487,15 +570,21 @@ beyond that, show the person a real message rather than a spinner.
 
 ## Open questions
 
-These block Phase 0, not the rest of the design:
+**Answered (2026-08-06):**
 
-1. **Firebase confirmed?** If you'd rather not add a Google dependency, Auth0 changes only
-   the issuer string and the Flutter package — everything else in this document stands.
-2. **Which providers at launch?** Recommendation: email/password + Google in Phase 3–4;
-   Apple when there's an iOS build, since it needs the $99 developer account and is only
-   *required* once you ship to the App Store with Google sign-in enabled.
+1. ~~**Firebase confirmed?**~~ **Yes.** Firebase Auth. The project `swift-study-app` is
+   created and `flutterfire configure` has run against it.
+2. ~~**Which providers at launch?**~~ **Email/password + Google Sign-In.** Apple deferred —
+   see [Apple is out of scope](#apple-is-out-of-scope) for the App Store condition that
+   would force it back on the list.
+
+**Still open — these block Phase 0, not the rest of the design:**
+
 3. **Handle changes — allowed?** Recommendation: not in v1. `@mentions` and shared profile
    links break, and there's no redirect table to fix them.
 4. **`is_private` at registration?** The column exists and gates follow approval. Simplest:
    default `false`, expose the toggle on the Profile tab in Phase 4, and let it matter when
    `follows` ships in v2.
+5. **Real bundle ID — what is it?** `com.example.mobile` has to change before Google
+   Sign-In config is worth doing twice. Something like `app.studease.mobile`. Cheap now,
+   expensive after Firebase apps and OAuth clients are keyed to it.

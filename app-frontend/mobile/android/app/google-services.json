@@ -7,12 +7,25 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:219277229074:android:90a207550c127d0d75accb",
+        "mobilesdk_app_id": "1:219277229074:android:d79de065c013d51275accb",
         "android_client_info": {
-          "package_name": "com.example.mobile"
+          "package_name": "app.studease.mobile"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "219277229074-f0h5j5fb90pb06ve77j55agk0m9uaokm.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "app.studease.mobile",
+            "certificate_hash": "7265d9c8aaf7d9d35a7061f20236fb0b3246b64d"
+          }
+        },
+        {
+          "client_id": "219277229074-ecqpdq7s81pcso3bd1km5g8ugcd2joke.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyBDCUaMjte8qe8iCO0KLW4o7TsvXxVkMq4"
@@ -20,7 +33,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "219277229074-ecqpdq7s81pcso3bd1km5g8ugcd2joke.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "219277229074-0bf7og5u0nd9cii77h8t122kf3j974k4.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "app.studease.mobile"
+              }
+            }
+          ]
         }
       }
     }

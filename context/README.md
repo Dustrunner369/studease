@@ -8,7 +8,7 @@ specs, not generated output: when the code and these docs disagree, one of them 
 | [data-model.md](data-model.md) | Entities, relationships, invariants, build order, migration off today's schema |
 | [schema.sql](schema.sql) | Postgres DDL for the target model (reference — EF migrations stay the source of truth) |
 | [api-contracts.md](api-contracts.md) | JSON shapes on the wire, shared by the .NET API, Flutter app, and Angular web app |
-| [auth-plan.md](auth-plan.md) | Sign-in and registration — provider choice, endpoints, client work, build order (**planned, not built**) |
+| [auth-plan.md](auth-plan.md) | Sign-in and registration — Firebase Auth with email/password + Google, endpoints, client work, build order (**decided, not built**) |
 
 ## The shape of the app, in one paragraph
 
@@ -60,11 +60,11 @@ delete-my-rating flows working end to end.
 
 These block specific pieces of work, not the schema as a whole:
 
-1. **Auth provider** — blocks `users` landing. Recommendation: an external IdP
-   (Auth0/Clerk/Supabase/Firebase) with `auth_provider` + `auth_subject` on `users`, so
-   the API never stores a password. ASP.NET Core Identity is the alternative if you'd
-   rather keep it in-process. **[auth-plan.md](auth-plan.md) works this out in full** —
-   provider comparison, endpoints, client work, build order — and is waiting on a decision.
+1. ~~**Auth provider**~~ — **decided 2026-08-06: Firebase Auth, with email/password and
+   Google Sign-In.** `auth_provider` + `auth_subject` on `users`, so the API never stores a
+   password. Sign in with Apple is deferred; see the App Store condition in
+   [auth-plan.md](auth-plan.md), which carries the full design — endpoints, client work,
+   build order. Still unbuilt: every request runs as the seeded dev user.
 2. **Photo storage** — blocks the `photos` table being useful. Recommendation: S3-compatible
    object storage (R2, Supabase Storage) with `storage_key` in Postgres and the URL derived
    at read time. A local Docker volume works for development.

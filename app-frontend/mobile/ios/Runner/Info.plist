@@ -66,5 +66,20 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<!-- Google Sign-In returns from Safari through this scheme. The value is the
+	     REVERSED_CLIENT_ID from GoogleService-Info.plist and must stay in step with it:
+	     re-downloading that file after changing the bundle ID or OAuth client changes
+	     this string too. Without it the sign-in sheet opens and never comes back. -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.219277229074-0bf7og5u0nd9cii77h8t122kf3j974k4</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>
