@@ -20,6 +20,12 @@ public class User : ITimestamped
     public string? Bio { get; set; }
     public bool IsPrivate { get; set; }
 
+    // True for a Firebase anonymous session auto-provisioned by CurrentUser so guests
+    // never see a registration screen. Handle is a throwaway "guest_xxxxx" until POST
+    // /me flips this to false - which happens in place, because Firebase account
+    // linking keeps the same uid, so it's still the same row and the same auth_subject.
+    public bool IsGuest { get; set; }
+
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
     public DateTime? DeletedAt { get; set; }

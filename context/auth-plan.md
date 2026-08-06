@@ -9,6 +9,12 @@ in [README.md](README.md). See [data-model.md](data-model.md) for the `users` ta
 > **Decided (2026-08-06): Firebase Auth, with email/password and Google Sign-In.**
 > Sign in with Apple is **not** in scope — see [Apple is out of scope](#apple-is-out-of-scope)
 > for the App Store condition that would force a revisit.
+>
+> **Built (2026-08-06): Phases 1-3, plus guest mode** (an addition to this plan, not in
+> the original design below — see [Guest mode](#guest-mode-built-2026-08-06)). Every
+> endpoint requires a valid Firebase token, `GET`/`POST /me` exist, and the Flutter app
+> signs in with email/password. Google Sign-In (Phase 4) and hardening (Phase 5) are
+> still open.
 
 ## Where we are today
 
@@ -95,6 +101,50 @@ So every client is in exactly one of three states:
 
 The middle state is the one that gets forgotten and then causes a blank screen on a fresh
 install. Model it explicitly from the start.
+
+## Guest mode (built 2026-08-06)
+
+An addition to this plan, not in the original design above: the app is usable with no
+sign-in at all. Nobody sees a sign-in wall — on first launch the Flutter client calls
+`FirebaseAuth.instance.signInAnonymously()` automatically, before the user has done
+anything. That anonymous session gets a real Firebase ID token like any other, so it
+authenticates against the API exactly the same way a registered user's does.
+
+**This doesn't contradict Decision A2.** A guest still gets no `handle`/`displayName`
+until they explicitly choose one — the difference is the backend auto-provisions a
+*throwaway* `users` row (`CurrentUser.GetAsync` in `Program.cs`, handle
+`guest_xxxxxxxx`, `is_guest = true`) so a guest can use `/spots` and `/me/spots` at all,
+since `spot_entries.user_id` is a required FK. Nothing about that row is meant to be
+permanent or public-facing; `POST /me` still requires an explicit, chosen handle before
+`is_guest` flips to `false`.
+
+**The upgrade is free because Firebase account linking preserves the uid.** Creating a
+real account calls `currentUser.linkWithCredential(...)` rather than a fresh sign-up
+call. Firebase attaches the new credential to the *same* Firebase user, so
+`(auth_provider, auth_subject)` — the backend's login key — never changes. The guest's
+`users` row isn't replaced, just updated: `POST /me` finds the existing row via that
+same key and overwrites the throwaway handle with the real one. Every spot the guest
+already rated is already attached to that row's id, so nothing needs migrating.
+
+**Guests are capped at 3 spot entries** (`GuestEntryLimit` in `Program.cs`), enforced in
+`PUT /spots/{id}/entry`: only a *new* entry counts against it, re-rating a spot already
+rated never does. Past the cap the endpoint returns `403` with problem type
+`entry-limit-reached` (see [api-contracts.md](api-contracts.md)); the Flutter client
+catches that specifically and offers account creation rather than showing a generic
+error.
+
+**Signing in to an existing account (not signing up) abandons the guest session.**
+`signInWithEmailAndPassword` can't link — Firebase rejects linking a credential that
+already belongs to another account — so a returning user's guest spots from *that*
+install are left behind under an anonymous uid nobody can reach again. Accepted
+tradeoff: Firebase has no "merge two accounts" operation, and someone signing in
+already has their own history to return to. Same logic applies after `signOut()`, which
+starts a brand new anonymous session from zero.
+
+**What guest mode does *not* do:** no local/offline entry counting — the cap is
+enforced server-side, from the actual row count, every time. A guest who reinstalls the
+app gets a new anonymous uid and a fresh cap; that's an accepted gap, not a bug to
+engineer around.
 
 ### Apple is out of scope
 
@@ -482,27 +532,32 @@ project `swift-study-app` exists and `flutterfire configure` has run. Remaining:
 **Email/Password** and **Google** providers in the console, set the one-account-per-email
 setting (see Gotchas), and answer the open questions below.
 
-**Phase 1 — backend accepts tokens.** JwtBearer, `CurrentUser`, `AddHttpContextAccessor`,
-dev bypass on. Replace every `currentUserId` reference. Nothing else changes: with the
-bypass on, the app behaves exactly as it does today. *Done when the existing Flutter app
-still works untouched and a real Firebase token also authenticates.*
+**Phase 1 — backend accepts tokens. ✅ Built 2026-08-06.** JwtBearer, `CurrentUser`,
+`AddHttpContextAccessor`, dev bypass on. Replaced every `currentUserId` reference.
+*Verified: dev bypass still authenticates as the seeded dev user with no token, and a
+garbage bearer token gets a real `401`.*
 
-**Phase 2 — registration.** `GET /me`, `POST /me`, `GET /users/handle-available`, the
-`RequireRegistered` filter, handle validation + reserved list, and the migration adding the
-handle format check. *Done when a fresh identity can register over curl and immediately
-read `/me/spots`.*
+**Phase 2 — registration. ✅ Built 2026-08-06, expanded.** `GET /me`, `POST /me`, the
+`RequireRegisteredFilter`, handle validation + reserved list, and the migration adding
+the handle format check (`ck_users_handle_format`). **Not built:**
+`GET /users/handle-available` — descoped; the client validates the pattern locally and
+handles the `409` from `POST /me` instead. **Added beyond the original plan:** guest
+auto-provisioning and the 3-entry cap — see [Guest mode](#guest-mode-built-2026-08-06).
 
-**Phase 3 — Flutter signs in.** `firebase_core` + `firebase_auth` (both already added),
-`AuthController`, auth gate, sign-in screen, token attachment and 401 retry in
-`api_service.dart`. **Email/password only** — one provider at a time, and this one needs no
-native configuration. *Done when you sign in on a device and see your spots.*
+**Phase 3 — Flutter signs in. ✅ Built 2026-08-06.** `AuthController`, the boot-time
+auth gate in `main.dart` (`ListenableBuilder` at the root, per this plan), sign-in/sign-up
+screens, token attachment and 401 retry in `api_service.dart`. **Email/password only**,
+as planned. Went further than "signs in" alone: the app is usable *before* signing in
+too — see [Guest mode](#guest-mode-built-2026-08-06).
 
-**Phase 4 — Google Sign-In and the rest of the client.** Enable the Google provider,
-re-download `GoogleService-Info.plist`, wire it into the Xcode target, add the URL scheme,
-register the Android SHA-1s, fix the bundle ID, then add `google_sign_in`. Plus the
-onboarding screen, Profile tab, sign out, and password reset. *Done when Google sign-in works
-on a real Android device and a real iPhone — the simulator hides SHA-1 and URL-scheme
-problems.*
+**Phase 4 — Google Sign-In.** Native config (Xcode target, URL scheme, Android SHA-1s,
+bundle ID) is already done as of 2026-08-06; `google_sign_in` is already a dependency.
+What's left: the actual provider call and button — `google_sign_in` 7.x's
+`initialize()`/`authenticate()`, not the old `signIn()` — and deciding whether it also
+links from a guest session the same way email/password sign-up does. Password reset is
+also still open; the onboarding screen, Profile tab, and sign out landed early, in
+Phase 3, as part of guest mode. *Done when Google sign-in works on a real Android device
+and a real iPhone — the simulator hides SHA-1 and URL-scheme problems.*
 
 **Phase 5 — harden.** Bypass off in every non-development configuration, rate limits,
 `DELETE /me`, production CORS origins, and the dev-user data decision above.
@@ -578,13 +633,14 @@ beyond that, show the person a real message rather than a spinner.
    see [Apple is out of scope](#apple-is-out-of-scope) for the App Store condition that
    would force it back on the list.
 
-**Still open — these block Phase 0, not the rest of the design:**
+**Still open:**
 
 3. **Handle changes — allowed?** Recommendation: not in v1. `@mentions` and shared profile
    links break, and there's no redirect table to fix them.
 4. **`is_private` at registration?** The column exists and gates follow approval. Simplest:
    default `false`, expose the toggle on the Profile tab in Phase 4, and let it matter when
    `follows` ships in v2.
-5. **Real bundle ID — what is it?** `com.example.mobile` has to change before Google
-   Sign-In config is worth doing twice. Something like `app.studease.mobile`. Cheap now,
-   expensive after Firebase apps and OAuth clients are keyed to it.
+
+**Answered (2026-08-06):**
+
+5. ~~**Real bundle ID — what is it?**~~ **`app.studease.mobile`**, on both platforms.

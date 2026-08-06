@@ -64,7 +64,14 @@ These block specific pieces of work, not the schema as a whole:
    Google Sign-In.** `auth_provider` + `auth_subject` on `users`, so the API never stores a
    password. Sign in with Apple is deferred; see the App Store condition in
    [auth-plan.md](auth-plan.md), which carries the full design — endpoints, client work,
-   build order. Still unbuilt: every request runs as the seeded dev user.
+   build order. **Built 2026-08-06: Phases 1-3** — every endpoint requires a valid
+   Firebase token (or the fenced dev bypass), `GET`/`POST /me`, and the Flutter app
+   signs in. Also built, ahead of the original plan: **guest mode** — the app starts an
+   anonymous Firebase session automatically so nobody sees a sign-in wall, capped at 3
+   spot entries, upgraded to a real account in place (same uid, same spots) via
+   `POST /me`. Still unbuilt: Google Sign-In (Phase 4 — the native config is already
+   wired, just not the Dart button), rate limiting and the bypass-off hardening
+   (Phase 5).
 2. **Photo storage** — blocks the `photos` table being useful. Recommendation: S3-compatible
    object storage (R2, Supabase Storage) with `storage_key` in Postgres and the URL derived
    at read time. A local Docker volume works for development.

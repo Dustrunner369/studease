@@ -1,8 +1,12 @@
+using System.Text.RegularExpressions;
 using study_spot_backend;
 using study_spot_backend.Dtos;
 using study_spot_backend.Models;
 using study_spot_backend.Services;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -34,7 +38,70 @@ builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 builder.Services.AddHttpClient<PlacesClient>();
 builder.Services.AddProblemDetails();
 
+// ---------------------------------------------------------------------------
+// Auth
+// ---------------------------------------------------------------------------
+
+var firebaseProjectId = builder.Configuration["Auth:FirebaseProjectId"];
+
+// Dev only, and only when explicitly asked for. Two conditions, not one: an env var
+// alone must never be enough to disable auth on a deployed instance.
+var allowDevBypass = builder.Environment.IsDevelopment()
+    && builder.Configuration.GetValue<bool>("Auth:AllowDevBypass");
+
+const string DevOrBearerScheme = "DevOrBearer";
+
+var authBuilder = builder.Services.AddAuthentication(options =>
+{
+    options.DefaultScheme = allowDevBypass ? DevOrBearerScheme : JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultAuthenticateScheme = options.DefaultScheme;
+    options.DefaultChallengeScheme = options.DefaultScheme;
+});
+
+authBuilder.AddJwtBearer(options =>
+{
+    // Firebase publishes an OIDC discovery document here, so JwtBearer fetches and
+    // caches the signing keys itself and rotates them without a restart.
+    options.Authority = $"https://securetoken.google.com/{firebaseProjectId}";
+    options.Audience = firebaseProjectId;
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidIssuer = $"https://securetoken.google.com/{firebaseProjectId}",
+        ValidateIssuer = true,
+        ValidateAudience = true,
+        ValidateLifetime = true,
+        // Set timer to 30 seconds instead of 5 minute default  
+        ClockSkew = TimeSpan.FromSeconds(30),
+    };
+});
+
+if (allowDevBypass)
+{
+    authBuilder.AddScheme<AuthenticationSchemeOptions, DevBypassAuthHandler>("DevBypass", _ => { });
+
+    // A real bearer token still gets validated as a real token; only requests with no
+    // Authorization header at all fall back to the seeded dev user.
+    authBuilder.AddPolicyScheme(DevOrBearerScheme, DevOrBearerScheme, options =>
+    {
+        options.ForwardDefaultSelector = context =>
+            context.Request.Headers.ContainsKey("Authorization")
+                ? JwtBearerDefaults.AuthenticationScheme
+                : "DevBypass";
+    });
+}
+
+builder.Services.AddAuthorization();
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<CurrentUser>();
+
 var app = builder.Build();
+
+if (allowDevBypass)
+{
+    app.Logger.LogWarning(
+        "Auth:AllowDevBypass is ON - unauthenticated requests are treated as the seeded " +
+        "dev user. Never enable this outside Development.");
+}
 
 // Automatically applies any database migrations at runtime.
 // NOTE: fine while this is a one-person project, but this means a container restart
@@ -48,15 +115,24 @@ using (var scope = app.Services.CreateScope())
 
 app.UseCors();
 
-// No auth yet: every request acts as the seeded dev user.
-var currentUserId = AppDbContext.DevUserId;
+app.UseAuthentication();
+app.UseAuthorization();
+
+// Every endpoint needs a valid token (or the dev bypass); `registered` additionally
+// needs an actual users row, which every guest already has (see CurrentUser).
+var api = app.MapGroup("").RequireAuthorization();
+var registered = api.MapGroup("").AddEndpointFilter<RequireRegisteredFilter>();
+
+const int guestEntryLimit = 3;
 
 // ---------------------------------------------------------------------------
 // Places
 // ---------------------------------------------------------------------------
 
-// Proxies Places Autocomplete so the API key never ships inside a client.
-app.MapGet("/places/search", async (string? q, PlacesClient places, CancellationToken ct) =>
+// Proxies Places Autocomplete so the API key never ships inside a client. Authenticated
+// but not behind RequireRegisteredFilter - it's a metered Google API, not user data, and
+// an unauthenticated version of this endpoint would be someone else's free Places quota.
+api.MapGet("/places/search", async (string? q, PlacesClient places, CancellationToken ct) =>
 {
     if (!places.IsConfigured)
     {
@@ -77,17 +153,103 @@ app.MapGet("/places/search", async (string? q, PlacesClient places, Cancellation
 });
 
 // ---------------------------------------------------------------------------
+// Me
+// ---------------------------------------------------------------------------
+
+// The client's boot call. 200 with the caller's account - guests included, they're
+// auto-provisioned by CurrentUser - or 404 if a real identity hasn't registered yet.
+api.MapGet("/me", async (CurrentUser currentUser, AppDbContext db, CancellationToken ct) =>
+{
+    var user = await currentUser.GetAsync(ct);
+    if (user is null) return Results.NotFound();
+
+    var entryCount = await db.SpotEntries.CountAsync(e => e.UserId == user.Id, ct);
+
+    return Results.Ok(new MeDto(user.Id, user.Handle, user.DisplayName, user.IsGuest, entryCount));
+});
+
+// Completes registration. Works whether this identity is brand new, or a guest
+// (IsGuest=true) upgrading in place - Firebase account linking keeps the same uid, so
+// it's the same users row and the same auth_subject either way.
+api.MapPost("/me", async (RegisterRequest request, CurrentUser currentUser, AppDbContext db, CancellationToken ct) =>
+{
+    var errors = ValidateHandle(request.Handle);
+
+    var displayName = request.DisplayName?.Trim();
+    if (string.IsNullOrWhiteSpace(displayName))
+    {
+        errors["displayName"] = ["A display name is required."];
+    }
+
+    if (errors.Count > 0) return Results.ValidationProblem(errors);
+
+    var handle = request.Handle.Trim().ToLowerInvariant();
+    var existing = await currentUser.GetAsync(ct);
+
+    if (existing is not null && !existing.IsGuest)
+    {
+        return Results.Problem(
+            title: "Already registered",
+            detail: "This identity already has an account.",
+            statusCode: StatusCodes.Status409Conflict);
+    }
+
+    var handleTaken = existing is null
+        ? await db.Users.AnyAsync(u => u.Handle == handle, ct)
+        : await db.Users.AnyAsync(u => u.Handle == handle && u.Id != existing.Id, ct);
+
+    if (handleTaken)
+    {
+        return Results.Problem(
+            title: "Handle already taken",
+            statusCode: StatusCodes.Status409Conflict);
+    }
+
+    if (existing is null)
+    {
+        var created = new User
+        {
+            Id = Guid.CreateVersion7(),
+            Handle = handle,
+            DisplayName = displayName!,
+            AuthProvider = currentUser.Provider,
+            AuthSubject = currentUser.Subject,
+            Email = currentUser.Email,
+            IsGuest = false,
+        };
+
+        db.Users.Add(created);
+        await db.SaveChangesAsync(ct);
+
+        return Results.Created("/me", new MeDto(created.Id, created.Handle, created.DisplayName, false, 0));
+    }
+
+    existing.Handle = handle;
+    existing.DisplayName = displayName!;
+    existing.IsGuest = false;
+    if (currentUser.Email is not null) existing.Email = currentUser.Email;
+
+    await db.SaveChangesAsync(ct);
+
+    var entryCount = await db.SpotEntries.CountAsync(e => e.UserId == existing.Id, ct);
+
+    return Results.Ok(new MeDto(existing.Id, existing.Handle, existing.DisplayName, false, entryCount));
+});
+
+// ---------------------------------------------------------------------------
 // Spots
 // ---------------------------------------------------------------------------
 
 // Creates a spot, or returns the existing one if this place is already known.
 // Idempotent by Place ID, which is what stops two users creating the same cafe twice.
-app.MapPost("/spots", async (
+registered.MapPost("/spots", async (
     CreateSpotRequest request,
     AppDbContext db,
     PlacesClient places,
+    CurrentUser currentUser,
     CancellationToken ct) =>
 {
+    var userId = await currentUser.IdAsync(ct);
     Spot spot;
 
     if (!string.IsNullOrWhiteSpace(request.GooglePlaceId))
@@ -95,7 +257,7 @@ app.MapPost("/spots", async (
         var existing = await db.Spots
             .FirstOrDefaultAsync(s => s.GooglePlaceId == request.GooglePlaceId, ct);
 
-        if (existing is not null) return Results.Ok(await ToDetailDto(existing, db, places, currentUserId, ct));
+        if (existing is not null) return Results.Ok(await ToDetailDto(existing, db, places, userId, ct));
 
         var details = await places.GetDetailsAsync(request.GooglePlaceId, ct);
 
@@ -124,7 +286,7 @@ app.MapPost("/spots", async (
             Type = SpotTypes.IsValid(request.Type)
                 ? request.Type!
                 : SpotTypes.FromGoogleTypes(details.Types),
-            AddedBy = currentUserId,
+            AddedBy = userId,
         };
     }
     else
@@ -146,20 +308,23 @@ app.MapPost("/spots", async (
             Name = request.Name.Trim(),
             FormattedAddress = string.IsNullOrWhiteSpace(request.Address) ? null : request.Address.Trim(),
             Type = SpotTypes.IsValid(request.Type) ? request.Type! : SpotTypes.Cafe,
-            AddedBy = currentUserId,
+            AddedBy = userId,
         };
     }
 
     db.Spots.Add(spot);
     await db.SaveChangesAsync(ct);
 
-    return Results.Created($"/spots/{spot.Id}", await ToDetailDto(spot, db, places, currentUserId, ct));
+    return Results.Created($"/spots/{spot.Id}", await ToDetailDto(spot, db, places, userId, ct));
 });
 
 // The ranked list behind the Spots tab: my entries, best first.
-app.MapGet("/me/spots", async (AppDbContext db, CancellationToken ct) =>
-    await db.SpotEntries
-        .Where(e => e.UserId == currentUserId)
+registered.MapGet("/me/spots", async (AppDbContext db, CurrentUser currentUser, CancellationToken ct) =>
+{
+    var userId = await currentUser.IdAsync(ct);
+
+    return await db.SpotEntries
+        .Where(e => e.UserId == userId)
         .Include(e => e.Spot)
         .OrderByDescending(e => e.Score)
         .ThenByDescending(e => e.UpdatedAt)
@@ -176,17 +341,19 @@ app.MapGet("/me/spots", async (AppDbContext db, CancellationToken ct) =>
             e.CoffeeOrder,
             e.Notes,
             e.UpdatedAt))
-        .ToListAsync(ct));
+        .ToListAsync(ct);
+});
 
 // Full detail for one spot, including hours fetched live from Places.
-app.MapGet("/spots/{id:guid}", async (
-    Guid id, AppDbContext db, PlacesClient places, CancellationToken ct) =>
+registered.MapGet("/spots/{id:guid}", async (
+    Guid id, AppDbContext db, PlacesClient places, CurrentUser currentUser, CancellationToken ct) =>
 {
     var spot = await db.Spots.FirstOrDefaultAsync(s => s.Id == id, ct);
+    if (spot is null) return Results.NotFound();
 
-    return spot is null
-        ? Results.NotFound()
-        : Results.Ok(await ToDetailDto(spot, db, places, currentUserId, ct));
+    var userId = await currentUser.IdAsync(ct);
+
+    return Results.Ok(await ToDetailDto(spot, db, places, userId, ct));
 });
 
 // ---------------------------------------------------------------------------
@@ -194,8 +361,8 @@ app.MapGet("/spots/{id:guid}", async (
 // ---------------------------------------------------------------------------
 
 // Upsert, not insert: re-rating a spot updates the row you already have (decision D2).
-app.MapPut("/spots/{id:guid}/entry", async (
-    Guid id, UpsertEntryRequest request, AppDbContext db, CancellationToken ct) =>
+registered.MapPut("/spots/{id:guid}/entry", async (
+    Guid id, UpsertEntryRequest request, AppDbContext db, CurrentUser currentUser, CancellationToken ct) =>
 {
     var validationErrors = ValidateRatings(request.Ratings);
     if (validationErrors.Count > 0) return Results.ValidationProblem(validationErrors);
@@ -206,17 +373,33 @@ app.MapPut("/spots/{id:guid}/entry", async (
         ? request.Visibility!
         : Visibilities.Public;
 
+    // RequireRegisteredFilter already ran, so this is never null.
+    var user = (await currentUser.GetAsync(ct))!;
+
     var entry = await db.SpotEntries
-        .FirstOrDefaultAsync(e => e.SpotId == id && e.UserId == currentUserId, ct);
+        .FirstOrDefaultAsync(e => e.SpotId == id && e.UserId == user.Id, ct);
 
     var created = entry is null;
+
+    if (created && user.IsGuest)
+    {
+        var guestEntryCount = await db.SpotEntries.CountAsync(e => e.UserId == user.Id, ct);
+        if (guestEntryCount >= guestEntryLimit)
+        {
+            return Results.Problem(
+                type: "https://studease.app/problems/entry-limit-reached",
+                title: "Guest entry limit reached",
+                detail: $"Guests can add up to {guestEntryLimit} spots. Create an account to add more.",
+                statusCode: StatusCodes.Status403Forbidden);
+        }
+    }
 
     if (entry is null)
     {
         entry = new SpotEntry
         {
             Id = Guid.CreateVersion7(),
-            UserId = currentUserId,
+            UserId = user.Id,
             SpotId = id,
         };
         db.SpotEntries.Add(entry);
@@ -242,10 +425,13 @@ app.MapPut("/spots/{id:guid}/entry", async (
 });
 
 // Removes my rating. The spot itself survives — someone else may have rated it.
-app.MapDelete("/spots/{id:guid}/entry", async (Guid id, AppDbContext db, CancellationToken ct) =>
+registered.MapDelete("/spots/{id:guid}/entry", async (
+    Guid id, AppDbContext db, CurrentUser currentUser, CancellationToken ct) =>
 {
+    var userId = await currentUser.IdAsync(ct);
+
     var entry = await db.SpotEntries
-        .FirstOrDefaultAsync(e => e.SpotId == id && e.UserId == currentUserId, ct);
+        .FirstOrDefaultAsync(e => e.SpotId == id && e.UserId == userId, ct);
 
     if (entry is null) return Results.NotFound();
 
@@ -286,6 +472,24 @@ static Dictionary<string, string[]> ValidateRatings(RatingsDto? ratings)
     Check("seating", ratings.Seating);
     Check("tableSize", ratings.TableSize);
     Check("coffee", ratings.Coffee);
+
+    return errors;
+}
+
+static Dictionary<string, string[]> ValidateHandle(string? handle)
+{
+    var errors = new Dictionary<string, string[]>();
+    var normalized = handle?.Trim().ToLowerInvariant() ?? "";
+
+    if (!Regex.IsMatch(normalized, @"^[a-z0-9_]{3,30}$"))
+    {
+        errors["handle"] =
+            ["Handle must be 3-30 characters: lowercase letters, numbers, and underscores only."];
+    }
+    else if (HandleRules.Reserved.Contains(normalized))
+    {
+        errors["handle"] = ["That handle is reserved."];
+    }
 
     return errors;
 }
@@ -378,3 +582,17 @@ static async Task RecomputeAggregates(AppDbContext db, Guid spotId, Cancellation
 
     await db.SaveChangesAsync(ct);
 }
+
+// Reserved handles would collide with this API's own URL space (GET /users/{handle} vs
+// GET /me), not just look silly. Mirrors context/auth-plan.md's handle rules.
+static class HandleRules
+{
+    public static readonly string[] Reserved =
+    [
+        "me", "admin", "api", "spots", "places", "feed", "users", "photos",
+        "support", "help", "settings", "about",
+    ];
+}
+
+// Needed so WebApplicationFactory<Program> (or `dotnet ef`) can see this as a type.
+public partial class Program;

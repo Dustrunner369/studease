@@ -17,8 +17,12 @@ contract; see [data-model.md](data-model.md) for what's behind them.
   most importantly `openUntil`. Clients must render without it.
 - **Errors** are `application/problem+json` (RFC 9457), which ASP.NET Core produces by
   default. Don't invent a second error shape.
-- **Auth**: `Authorization: Bearer <token>`; the API resolves the caller from
-  `(auth_provider, auth_subject)`. Endpoints under `/me` are caller-scoped.
+- **Auth**: `Authorization: Bearer <firebase-id-token>` on every endpoint; the API
+  resolves the caller from `(auth_provider, auth_subject)`. Endpoints under `/me` are
+  caller-scoped. **A guest is still authenticated** — the token comes from Firebase
+  anonymous sign-in, which the client starts automatically so nobody sees a sign-in wall.
+  See [auth-plan.md](auth-plan.md) for the full design and the guest/registration state
+  machine.
 
 ## Objects
 
@@ -32,6 +36,27 @@ contract; see [data-model.md](data-model.md) for what's behind them.
   "avatarUrl": "https://cdn.example/av/018f.jpg"
 }
 ```
+
+### `Me`
+
+**Built.** What `GET`/`POST /me` actually return today — narrower than `UserSummary`
+above (no `avatarUrl` yet; that's still v2 aspirational).
+
+```json
+{
+  "id": "018f...",
+  "handle": "guest_3f9a21bc",
+  "displayName": "Guest",
+  "isGuest": true,
+  "entryCount": 2
+}
+```
+
+`isGuest` is true for an auto-provisioned Firebase anonymous session — no registration
+screen was ever shown for it. It flips to `false` the moment `POST /me` runs, which for
+a former guest is an **upgrade in place**: Firebase account linking keeps the same uid,
+so `entryCount` (and every spot it counts) carries straight over, uncapped from then on.
+Guests are capped at 3 entries; see `entry-limit-reached` below.
 
 ### `Spot`
 
@@ -191,6 +216,30 @@ optional; sending `null` clears them. `score` is rejected if present.
 `groupStudy` is optional and defaults to `false`, so a client that predates the field
 still saves rather than getting a `400`.
 
+**Guests are capped at 3 entries.** The count only includes *new* spots — re-rating one
+already rated is always an update, never blocked. Past the cap, `PUT` returns `403` with:
+
+```json
+{ "type": "https://studease.app/problems/entry-limit-reached", "title": "Guest entry limit reached", "detail": "Guests can add up to 3 spots. Create an account to add more." }
+```
+
+The Flutter client matches on `type`, not the bare `403` — `POST /me` with no `users` row
+yet (`registration-required`) is also a `403` and means something different. See
+`ApiException.isGuestLimitReached` / `.needsRegistration` in `api_service.dart`.
+
+### My account
+
+**Built** (backend + Flutter, email/password only — see
+[auth-plan.md](auth-plan.md) Phase 4 for Google Sign-In).
+
+| Method | Path | Notes |
+| --- | --- | --- |
+| `GET` | `/me` | The caller's `Me` — `200` always for a guest (auto-provisioned), or a real identity that has registered. `404` if authenticated but genuinely unregistered (shouldn't happen via this app's own client, which is always anonymous-then-linked; kept for a future direct sign-up path). |
+| `POST` | `/me` | Body `{ "handle": "matt", "displayName": "Matthew" }`. Completes registration — for a brand-new identity, or a guest upgrading in place. `201` (new row) or `200` (guest upgraded), `409` if the handle is taken or this identity already has a real account, `422` if the handle fails `^[a-z0-9_]{3,30}$` or is reserved (`me`, `admin`, `api`, `spots`, `places`, `feed`, `users`, `photos`, `support`, `help`, `settings`, `about`). |
+
+**Not built:** `GET /users/handle-available` (client validates the pattern locally and
+just handles the `409` from `POST /me`), `PATCH /me`, `DELETE /me`.
+
 ### Social
 
 | Method | Path | Notes |
@@ -199,7 +248,6 @@ still saves rather than getting a `400`.
 | `POST` | `/users/{id}/follow` | `202` when the target is private (pending approval), `201` when public. |
 | `DELETE` | `/users/{id}/follow` | Unfollow, or withdraw a pending request. |
 | `GET` | `/users/{handle}` | Public profile plus their entries, respecting visibility. |
-| `GET` | `/me` | The caller's own `UserSummary` and counts. |
 
 ### Photos
 
@@ -209,6 +257,13 @@ still saves rather than getting a `400`.
 | `DELETE` | `/photos/{id}` | Soft delete; uploader or spot owner only. |
 
 ## Client status
+
+**Flutter — auth built 2026-08-06.** Every request now carries a Firebase ID token
+(`api_service.dart`'s `_headers()`), including a guest's anonymous one, with a single
+401-triggered refresh-and-retry. `AuthController` drives boot (anonymous sign-in →
+`GET /me`), sign-up/sign-in (`LoginPage`, linking the guest session), the handle picker
+(`ChooseHandlePage`), and the Profile tab's guest-vs-account view. No Google Sign-In
+button yet — Phase 4 in auth-plan.md.
 
 **Flutter — done.** `lib/models/spot.dart` replaced the old flat `StudySpot`, and
 `api_service.dart` was rewritten: the `Uri.https('localhost:5001', …)` call (https

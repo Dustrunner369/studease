@@ -3,22 +3,27 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:mobile/design/theme.dart';
+import 'package:mobile/features/authentication/presentation/login_page.dart';
+import 'package:mobile/models/me.dart';
 import 'package:mobile/models/spot.dart';
 import 'package:mobile/services/api_service.dart';
+import 'package:mobile/services/auth_controller.dart';
 
 /// Slides the add-spot form up from the bottom. Resolves to true when a spot was
 /// saved, so the caller knows to reload the list.
-Future<bool?> showAddSpotSheet(BuildContext context) {
+Future<bool?> showAddSpotSheet(BuildContext context, AuthController auth) {
   return showModalBottomSheet<bool>(
     context: context,
     backgroundColor: Colors.transparent,
     isScrollControlled: true,
-    builder: (_) => const AddSpotSheet(),
+    builder: (_) => AddSpotSheet(auth: auth),
   );
 }
 
 class AddSpotSheet extends StatefulWidget {
-  const AddSpotSheet({super.key});
+  final AuthController auth;
+
+  const AddSpotSheet({super.key, required this.auth});
 
   @override
   State<AddSpotSheet> createState() => _AddSpotSheetState();
@@ -178,15 +183,75 @@ class _AddSpotSheetState extends State<AddSpotSheet> {
         notes: _trimmedOrNull(_notesController),
       );
 
+      // Best-effort: keeps the Profile tab's entry count current without blocking
+      // this sheet on it, and without failing the save if it hiccups.
+      unawaited(widget.auth.refreshMe());
+
       if (!mounted) return;
       Navigator.of(context).pop(true);
     } on ApiException catch (e) {
       if (!mounted) return;
+
+      if (e.isGuestLimitReached) {
+        setState(() => _saving = false);
+        await _showGuestLimitDialog();
+        return;
+      }
+
       setState(() {
         _error = e.message;
         _saving = false;
       });
     }
+  }
+
+  Future<void> _showGuestLimitDialog() async {
+    final createAccount = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: Tone.bg,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: Text(
+          "You've hit the guest limit",
+          style: GoogleFonts.plusJakartaSans(fontSize: 17, fontWeight: FontWeight.w800, color: Tone.ink),
+        ),
+        content: Text(
+          'Guests can add up to $guestEntryLimit spots. Create an account to keep adding — '
+          "and to keep the ones you've already added for good.",
+          style: GoogleFonts.plusJakartaSans(fontSize: 13.5, fontWeight: FontWeight.w500, color: Tone.muted),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(
+              'Not now',
+              style: GoogleFonts.plusJakartaSans(fontSize: 13.5, fontWeight: FontWeight.w700, color: Tone.muted),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text(
+              'Create account',
+              style: GoogleFonts.plusJakartaSans(fontSize: 13.5, fontWeight: FontWeight.w700, color: Tone.teal),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (createAccount != true || !mounted) return;
+
+    // Captured before popping the sheet: once its own route is gone, `context` is no
+    // longer safe to resolve a Navigator from, but the NavigatorState itself — the
+    // app's single, long-lived Navigator — is fine to keep using.
+    final navigator = Navigator.of(context);
+
+    // Close the sheet first: signing up navigates to a full page, and stacking that
+    // on top of a modal sheet reads as broken even though it technically works.
+    navigator.pop(false);
+    await navigator.push(MaterialPageRoute(
+      builder: (_) => LoginPage(auth: widget.auth, startInSignUp: true),
+    ));
   }
 
   static String? _trimmedOrNull(TextEditingController controller) {

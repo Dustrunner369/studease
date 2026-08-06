@@ -1,8 +1,10 @@
 import 'dart:convert';
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart' show defaultTargetPlatform, kIsWeb, TargetPlatform;
 import 'package:http/http.dart' as http;
 import 'package:mobile/design/theme.dart';
+import 'package:mobile/models/me.dart';
 import 'package:mobile/models/spot.dart';
 
 /// Where the API lives.
@@ -21,29 +23,69 @@ String get baseUrl {
   return 'http://localhost:5001';
 }
 
-const Map<String, String> _jsonHeaders = {
-  'Accept': 'application/json',
-  'Content-Type': 'application/json',
-};
+const _registrationRequiredType = 'https://studease.app/problems/registration-required';
+const _entryLimitReachedType = 'https://studease.app/problems/entry-limit-reached';
 
 /// A failed request, carrying a message worth showing the user.
 class ApiException implements Exception {
   final String message;
   final int? statusCode;
 
-  const ApiException(this.message, {this.statusCode});
+  /// RFC 9457 `type`, when the server sent one — a status code alone can't tell two
+  /// different 403s apart.
+  final String? problemType;
+
+  const ApiException(this.message, {this.statusCode, this.problemType});
 
   /// The server has no Google Places key configured, so search is switched off.
   /// The add-spot sheet uses this to fall back to typing a spot in by hand.
   bool get isPlacesUnavailable => statusCode == 503;
 
+  /// A valid token, but no users row yet. Shouldn't happen in this app's own flow —
+  /// every client is anonymous-then-linked — but a stray direct sign-up would land here.
+  bool get needsRegistration => problemType == _registrationRequiredType;
+
+  /// A guest tried to add a fourth spot. The caller should offer account creation.
+  bool get isGuestLimitReached => problemType == _entryLimitReachedType;
+
   @override
   String toString() => message;
 }
 
+/// Every call is authenticated: a guest's Firebase anonymous session carries a real ID
+/// token same as a registered user's, so the token attaches the same way either way.
+Future<Map<String, String>> _headers({bool forceRefresh = false}) async {
+  final token = await FirebaseAuth.instance.currentUser?.getIdToken(forceRefresh);
+
+  return {
+    'Accept': 'application/json',
+    'Content-Type': 'application/json',
+    if (token != null) 'Authorization': 'Bearer $token',
+  };
+}
+
+/// The client's boot call, and the source of truth for isGuest/entryCount.
+Future<Me> fetchMe() async {
+  final data = await _send((headers) => http.get(Uri.parse('$baseUrl/me'), headers: headers));
+
+  return Me.fromJson(data as Map<String, dynamic>);
+}
+
+/// Completes registration: a fresh identity, or a guest upgrading in place.
+Future<Me> registerMe({required String handle, required String displayName}) async {
+  final data = await _send((headers) => http.post(
+        Uri.parse('$baseUrl/me'),
+        headers: headers,
+        body: json.encode({'handle': handle, 'displayName': displayName}),
+      ));
+
+  return Me.fromJson(data as Map<String, dynamic>);
+}
+
 /// The ranked Spots tab: my entries, best first.
 Future<List<MySpotListItem>> fetchMySpots() async {
-  final data = await _send(() => http.get(Uri.parse('$baseUrl/me/spots'), headers: _jsonHeaders));
+  final data =
+      await _send((headers) => http.get(Uri.parse('$baseUrl/me/spots'), headers: headers));
 
   return (data as List<dynamic>)
       .map((item) => MySpotListItem.fromJson(item as Map<String, dynamic>))
@@ -52,7 +94,8 @@ Future<List<MySpotListItem>> fetchMySpots() async {
 
 /// Everything about one place, including hours fetched live from Google.
 Future<SpotDetail> fetchSpot(String spotId) async {
-  final data = await _send(() => http.get(Uri.parse('$baseUrl/spots/$spotId'), headers: _jsonHeaders));
+  final data =
+      await _send((headers) => http.get(Uri.parse('$baseUrl/spots/$spotId'), headers: headers));
 
   return SpotDetail.fromJson(data as Map<String, dynamic>);
 }
@@ -60,7 +103,7 @@ Future<SpotDetail> fetchSpot(String spotId) async {
 /// Google Places autocomplete, proxied so the API key stays on the server.
 Future<List<PlaceSuggestion>> searchPlaces(String query) async {
   final uri = Uri.parse('$baseUrl/places/search').replace(queryParameters: {'q': query});
-  final data = await _send(() => http.get(uri, headers: _jsonHeaders));
+  final data = await _send((headers) => http.get(uri, headers: headers));
 
   return (data as List<dynamic>)
       .map((item) => PlaceSuggestion.fromJson(item as Map<String, dynamic>))
@@ -77,9 +120,9 @@ Future<SpotDetail> createSpot({
   String? address,
   required SpotType type,
 }) async {
-  final data = await _send(() => http.post(
+  final data = await _send((headers) => http.post(
         Uri.parse('$baseUrl/spots'),
-        headers: _jsonHeaders,
+        headers: headers,
         body: json.encode({
           'googlePlaceId': googlePlaceId,
           'name': name,
@@ -93,6 +136,9 @@ Future<SpotDetail> createSpot({
 
 /// Saves my rating of a spot. Rating a place twice updates the same entry rather
 /// than adding a second one, so this doubles as the edit call.
+///
+/// Guests get a 403 (ApiException.isGuestLimitReached) past their third *new* spot —
+/// re-rating a spot already rated never counts against the cap.
 Future<SpotEntry> saveEntry({
   required String spotId,
   required Ratings ratings,
@@ -100,9 +146,9 @@ Future<SpotEntry> saveEntry({
   String? coffeeOrder,
   String? notes,
 }) async {
-  final data = await _send(() => http.put(
+  final data = await _send((headers) => http.put(
         Uri.parse('$baseUrl/spots/$spotId/entry'),
-        headers: _jsonHeaders,
+        headers: headers,
         body: json.encode({
           'ratings': ratings.toJson(),
           'groupStudy': groupStudy,
@@ -116,25 +162,40 @@ Future<SpotEntry> saveEntry({
 
 /// Removes my rating. The spot survives — someone else may have rated it too.
 Future<void> deleteEntry(String spotId) async {
-  await _send(() => http.delete(Uri.parse('$baseUrl/spots/$spotId/entry'), headers: _jsonHeaders));
+  await _send((headers) => http.delete(Uri.parse('$baseUrl/spots/$spotId/entry'), headers: headers));
 }
 
-Future<dynamic> _send(Future<http.Response> Function() request) async {
-  final http.Response response;
+Future<dynamic> _send(Future<http.Response> Function(Map<String, String> headers) request) async {
+  var response = await _attempt(request, forceRefresh: false);
 
-  try {
-    response = await request();
-  } catch (_) {
-    throw ApiException('Could not reach the server. Is the API running at $baseUrl?');
+  // The cached ID token can expire between requests; refresh once and retry before
+  // giving up. A second 401 after a forced refresh is a real auth failure.
+  if (response.statusCode == 401 && FirebaseAuth.instance.currentUser != null) {
+    response = await _attempt(request, forceRefresh: true);
   }
 
   if (response.statusCode < 200 || response.statusCode >= 300) {
-    throw ApiException(_messageFrom(response), statusCode: response.statusCode);
+    throw ApiException(
+      _messageFrom(response),
+      statusCode: response.statusCode,
+      problemType: _typeFrom(response),
+    );
   }
 
   if (response.body.isEmpty) return null;
 
   return json.decode(response.body);
+}
+
+Future<http.Response> _attempt(
+  Future<http.Response> Function(Map<String, String> headers) request, {
+  required bool forceRefresh,
+}) async {
+  try {
+    return await request(await _headers(forceRefresh: forceRefresh));
+  } catch (_) {
+    throw ApiException('Could not reach the server. Is the API running at $baseUrl?');
+  }
 }
 
 /// The API returns RFC 9457 problem+json, so pull the useful sentence out of it
@@ -160,4 +221,15 @@ String _messageFrom(http.Response response) {
   }
 
   return 'Request failed (${response.statusCode}).';
+}
+
+String? _typeFrom(http.Response response) {
+  try {
+    final body = json.decode(response.body);
+    if (body is Map<String, dynamic> && body['type'] is String) return body['type'] as String;
+  } catch (_) {
+    // Not JSON, or not the shape we expected.
+  }
+
+  return null;
 }

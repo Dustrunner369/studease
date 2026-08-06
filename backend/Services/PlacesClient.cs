@@ -82,7 +82,8 @@ public class PlacesClient(HttpClient http, IConfiguration configuration, ILogger
 
     public async Task<PlaceDetails?> GetDetailsAsync(string placeId, CancellationToken ct = default)
     {
-        if (!IsConfigured || string.IsNullOrWhiteSpace(placeId)) return null;
+        if (!IsConfigured || string.IsNullOrWhiteSpace(placeId)) 
+            return null;
 
         var url = string.Format(DetailsUrlFormat, Uri.EscapeDataString(placeId));
 

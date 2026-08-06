@@ -21,6 +21,16 @@ namespace study_spot_backend
                 entity.HasIndex(u => new { u.AuthProvider, u.AuthSubject }).IsUnique();
 
                 entity.Property(u => u.Handle).HasMaxLength(30);
+                entity.Property(u => u.IsGuest).HasDefaultValue(false);
+
+                entity.ToTable(t =>
+                {
+                    // Enforces the lowercasing the model comment on Handle promises - a direct
+                    // SQL insert can no longer quietly break case-insensitive uniqueness. Was
+                    // missing entirely until this migration; see "Drift, found while writing
+                    // this" in context/auth-plan.md.
+                    t.HasCheckConstraint("ck_users_handle_format", "handle ~ '^[a-z0-9_]{3,30}$'");
+                });
 
                 entity.HasData(new User
                 {

@@ -1,9 +1,13 @@
+import 'dart:async';
+
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:mobile/firebase_options.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:mobile/features/profile/presentation/profile_page.dart';
 import 'package:mobile/features/study_spots/presentation/add_spot_sheet.dart';
+import 'package:mobile/services/auth_controller.dart';
 import 'package:mobile/services/api_service.dart';
 import 'package:mobile/models/spot.dart';
 import 'package:mobile/design/theme.dart';
@@ -13,11 +17,17 @@ Future<void> main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
-  runApp(const StudySpotApp());
+
+  final auth = AuthController();
+  unawaited(auth.bootstrap());
+
+  runApp(StudySpotApp(auth: auth));
 }
 
 class StudySpotApp extends StatelessWidget {
-  const StudySpotApp({super.key});
+  final AuthController auth;
+
+  const StudySpotApp({super.key, required this.auth});
 
   @override
   Widget build(BuildContext context) {
@@ -32,7 +42,91 @@ class StudySpotApp extends StatelessWidget {
         splashColor: Tone.field,
         highlightColor: Tone.field,
       ),
-      home: const SpotsPage(),
+      // Nobody sees this stall for long: bootstrap signs a guest in anonymously before
+      // fetching /me, so "loading" only ever covers that one round trip.
+      home: ListenableBuilder(
+        listenable: auth,
+        builder: (context, _) => switch (auth.phase) {
+          AuthPhase.loading => const _BootSplash(),
+          AuthPhase.error => _BootError(auth: auth),
+          AuthPhase.ready => SpotsPage(auth: auth),
+        },
+      ),
+    );
+  }
+}
+
+class _BootSplash extends StatelessWidget {
+  const _BootSplash();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      backgroundColor: Tone.bg,
+      body: Center(
+        child: SizedBox(
+          width: 26,
+          height: 26,
+          child: CircularProgressIndicator(strokeWidth: 2.5, color: Tone.ink),
+        ),
+      ),
+    );
+  }
+}
+
+class _BootError extends StatelessWidget {
+  final AuthController auth;
+
+  const _BootError({required this.auth});
+
+  // Bootstrap fails two very different ways: Firebase itself rejecting the sign-in
+  // (a console config problem, e.g. the Anonymous provider being disabled — nothing
+  // to do with the API), or the API being unreachable once a token exists. Telling
+  // them apart here saves someone debugging their backend for a Firebase console
+  // setting, or vice versa.
+  bool get _isAuthFailure => auth.error is FirebaseAuthException;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Tone.bg,
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(_isAuthFailure ? Icons.lock_outline : Icons.cloud_off, size: 32, color: Tone.muted),
+              const SizedBox(height: 12),
+              Text(
+                _isAuthFailure ? "Couldn't sign you in" : "Couldn't reach the server",
+                style: GoogleFonts.plusJakartaSans(fontSize: 15, fontWeight: FontWeight.w700, color: Tone.ink),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '${auth.error}',
+                textAlign: TextAlign.center,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.plusJakartaSans(fontSize: 12.5, fontWeight: FontWeight.w500, color: Tone.muted),
+              ),
+              const SizedBox(height: 16),
+              InkWell(
+                onTap: auth.bootstrap,
+                borderRadius: BorderRadius.circular(20),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 10),
+                  decoration: BoxDecoration(color: Tone.ink, borderRadius: BorderRadius.circular(20)),
+                  child: Text(
+                    'Retry',
+                    style: GoogleFonts.plusJakartaSans(fontSize: 13.5, fontWeight: FontWeight.w700, color: Colors.white),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -78,7 +172,9 @@ extension SpotPresentation on MySpotListItem {
 // ---------------------------------------------------------------------------
 
 class SpotsPage extends StatefulWidget {
-  const SpotsPage({super.key});
+  final AuthController auth;
+
+  const SpotsPage({super.key, required this.auth});
 
   @override
   State<SpotsPage> createState() => _SpotsPageState();
@@ -124,7 +220,7 @@ class _SpotsPageState extends State<SpotsPage> {
   }
 
   Future<void> _addSpot() async {
-    final saved = await showAddSpotSheet(context);
+    final saved = await showAddSpotSheet(context, widget.auth);
     if (saved == true && mounted) await _load();
   }
 
@@ -249,7 +345,7 @@ class _SpotsPageState extends State<SpotsPage> {
         shape: const CircleBorder(),
         child: const Icon(Icons.add, color: Colors.white),
       ),
-      bottomNavigationBar: const CleanBottomNav(),
+      bottomNavigationBar: CleanBottomNav(currentIndex: 0, auth: widget.auth),
     );
   }
 
@@ -1009,8 +1105,28 @@ class _SheetButton extends StatelessWidget {
 // Bottom nav
 // ---------------------------------------------------------------------------
 
+/// Each tab is its own full Scaffold rather than one shared shell — see SpotsPage,
+/// _MapComingSoonPage, and ProfilePage — so switching tabs is a plain
+/// pushReplacement rather than an IndexedStack. Smallest thing that works without
+/// go_router or lifting SpotsPage's FAB/list state up into a shell; see
+/// context/auth-plan.md on deferring routing changes.
 class CleanBottomNav extends StatelessWidget {
-  const CleanBottomNav({super.key});
+  final int currentIndex;
+  final AuthController auth;
+
+  const CleanBottomNav({super.key, required this.currentIndex, required this.auth});
+
+  void _select(BuildContext context, int index) {
+    if (index == currentIndex) return;
+
+    final page = switch (index) {
+      0 => SpotsPage(auth: auth),
+      1 => _MapComingSoonPage(auth: auth),
+      _ => ProfilePage(auth: auth),
+    };
+
+    Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => page));
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1025,11 +1141,25 @@ class CleanBottomNav extends StatelessWidget {
           height: 60,
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: const [
-              _NavItem(icon: Icons.place, label: 'Spots', active: true),
-              _NavItem(icon: Icons.map_outlined, label: 'Map', active: false),
+            children: [
               _NavItem(
-                  icon: Icons.person_outline, label: 'Profile', active: false),
+                icon: Icons.place,
+                label: 'Spots',
+                active: currentIndex == 0,
+                onTap: () => _select(context, 0),
+              ),
+              _NavItem(
+                icon: Icons.map_outlined,
+                label: 'Map',
+                active: currentIndex == 1,
+                onTap: () => _select(context, 1),
+              ),
+              _NavItem(
+                icon: Icons.person_outline,
+                label: 'Profile',
+                active: currentIndex == 2,
+                onTap: () => _select(context, 2),
+              ),
             ],
           ),
         ),
@@ -1042,31 +1172,61 @@ class _NavItem extends StatelessWidget {
   final IconData icon;
   final String label;
   final bool active;
+  final VoidCallback onTap;
 
   const _NavItem({
     required this.icon,
     required this.label,
     required this.active,
+    required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
     final color = active ? Tone.ink : const Color(0xFF98A2B3);
 
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Icon(icon, size: 22, color: color),
-        const SizedBox(height: 2),
-        Text(
-          label,
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 11,
-            fontWeight: active ? FontWeight.w700 : FontWeight.w500,
-            color: color,
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 22, color: color),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 11,
+                fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+                color: color,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MapComingSoonPage extends StatelessWidget {
+  final AuthController auth;
+
+  const _MapComingSoonPage({required this.auth});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: SafeArea(
+        child: Center(
+          child: Text(
+            'Map — coming soon',
+            style: GoogleFonts.plusJakartaSans(fontSize: 14, fontWeight: FontWeight.w600, color: Tone.muted),
           ),
         ),
-      ],
+      ),
+      bottomNavigationBar: CleanBottomNav(currentIndex: 1, auth: auth),
     );
   }
 }
