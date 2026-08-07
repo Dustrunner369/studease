@@ -181,7 +181,8 @@ class SpotsPage extends StatefulWidget {
 }
 
 class _SpotsPageState extends State<SpotsPage> {
-  SpotType? _filter;
+  // Multi-select, AND semantics: a spot must carry every selected tag to show.
+  final Set<String> _filterTags = {};
 
   // Held as a list rather than a Future so a row can be removed the instant it's
   // swiped away, without waiting for the server to confirm.
@@ -273,6 +274,8 @@ class _SpotsPageState extends State<SpotsPage> {
       await saveEntry(
         spotId: spot.spotId,
         ratings: spot.ratings,
+        groupStudy: spot.groupStudy,
+        tagSlugs: spot.tags,
         coffeeOrder: spot.coffeeOrder,
         notes: spot.notes,
       );
@@ -308,7 +311,9 @@ class _SpotsPageState extends State<SpotsPage> {
     final spots = _spots;
     final visible = spots == null
         ? const <MySpotListItem>[]
-        : (_filter == null ? spots : spots.where((s) => s.type == _filter).toList());
+        : (_filterTags.isEmpty
+            ? spots
+            : spots.where((s) => _filterTags.every(s.tags.contains)).toList());
 
     return Scaffold(
       body: SafeArea(
@@ -378,9 +383,9 @@ class _SpotsPageState extends State<SpotsPage> {
           padding: const EdgeInsets.symmetric(vertical: 80),
           child: Center(
             child: Text(
-              _filter == null
+              _filterTags.isEmpty
                   ? 'No spots yet — tap + to add one'
-                  : 'No ${_filter!.label.toLowerCase()} spots',
+                  : 'No spots tagged ${_filterTags.map((t) => '#$t').join(', ')}',
               style: GoogleFonts.plusJakartaSans(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
@@ -493,34 +498,39 @@ class _SpotsPageState extends State<SpotsPage> {
     );
   }
 
+  // Options come from whatever tags are actually present on the loaded spots, not
+  // the full global label list — a chip that would always show zero results isn't
+  // worth offering.
   Widget _buildFilters() {
-    final options = <(String, SpotType?)>[
-      ('All', null),
-      for (final t in SpotType.values) (t.label, t),
-    ];
+    final tags = {for (final s in _spots ?? const <MySpotListItem>[]) ...s.tags}.toList()
+      ..sort();
+
+    if (tags.isEmpty) return const SizedBox.shrink();
 
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       clipBehavior: Clip.none,
       child: Row(
         children: [
-          for (final (label, type) in options) ...[
+          for (final tag in tags) ...[
             InkWell(
-              onTap: () => setState(() => _filter = type),
+              onTap: () => setState(() {
+                if (!_filterTags.remove(tag)) _filterTags.add(tag);
+              }),
               borderRadius: BorderRadius.circular(20),
               child: Container(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 decoration: BoxDecoration(
-                  color: _filter == type ? Tone.ink : Tone.field,
+                  color: _filterTags.contains(tag) ? Tone.ink : Tone.field,
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
-                  label,
+                  '#$tag',
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
-                    color: _filter == type ? Colors.white : Tone.ink,
+                    color: _filterTags.contains(tag) ? Colors.white : Tone.ink,
                   ),
                 ),
               ),
@@ -663,7 +673,7 @@ class SpotRow extends StatelessWidget {
                 ),
               ),
             ),
-            _CategoryCircle(type: spot.type),
+            const _CategoryCircle(),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -710,6 +720,10 @@ class SpotRow extends StatelessWidget {
                         ),
                     ],
                   ),
+                  if (spot.tags.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    _TagPills(tags: spot.tags),
+                  ],
                 ],
               ),
             ),
@@ -722,18 +736,56 @@ class SpotRow extends StatelessWidget {
   }
 }
 
+// Every row gets the same neutral glyph now — spots no longer have a single category
+// to color-code by, since a spot's tags are optional and multi-valued (see the
+// label/tag system replacing SpotType). A visible step down from the old per-category
+// icon+color, accepted as the mechanical trade for this pass; tags render as pills
+// below the name instead, not a leading glyph.
 class _CategoryCircle extends StatelessWidget {
-  final SpotType type;
-
-  const _CategoryCircle({required this.type});
+  const _CategoryCircle();
 
   @override
   Widget build(BuildContext context) {
     return Container(
       width: 44,
       height: 44,
-      decoration: BoxDecoration(color: type.pastel, shape: BoxShape.circle),
-      child: Icon(type.icon, size: 20, color: type.accent),
+      decoration: const BoxDecoration(color: Tone.field, shape: BoxShape.circle),
+      child: const Icon(Icons.place, size: 20, color: Tone.muted),
+    );
+  }
+}
+
+/// A non-interactive `#slug` pill row — the row/detail-sheet display counterpart to
+/// the tappable filter chips in `_buildFilters` and the tappable picker chips in
+/// add_spot_sheet.dart. Same visual language, different behavior.
+class _TagPills extends StatelessWidget {
+  final List<String> tags;
+
+  const _TagPills({required this.tags});
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 6,
+      runSpacing: 6,
+      children: [
+        for (final tag in tags)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: Tone.field,
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: Text(
+              '#$tag',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w700,
+                color: Tone.ink,
+              ),
+            ),
+          ),
+      ],
     );
   }
 }
@@ -824,7 +876,7 @@ class SpotDetailSheet extends StatelessWidget {
                 const SizedBox(height: 20),
                 Row(
                   children: [
-                    _CategoryCircle(type: spot.type),
+                    const _CategoryCircle(),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(
@@ -927,6 +979,22 @@ class SpotDetailSheet extends StatelessWidget {
                     ],
                   ),
                 ),
+                if (spot.tags.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  Text(
+                    'TAGS',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 1.2,
+                      color: Tone.muted,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  // My own tags, not the spot-wide aggregate — everyone's opinion
+                  // would need a second request (SpotDetail, not MySpotListItem).
+                  _TagPills(tags: spot.tags),
+                ],
                 if (spot.details.isNotEmpty) ...[
                   const SizedBox(height: 10),
                   Text(
@@ -1035,16 +1103,18 @@ class _HoursLineState extends State<_HoursLine> {
       setState(() => _openUntil = detail.openUntil);
     } catch (_) {
       // Hours are a nicety, not the point of the sheet — a failed lookup just
-      // leaves the line showing the category on its own.
+      // leaves this line blank rather than showing a stale category label.
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final label = widget.spot.type.label;
+    // No category label to fall back on since SpotType was removed — this line is
+    // only ever hours now, and says nothing at all until the lookup lands.
+    if (_openUntil == null) return const SizedBox.shrink();
 
     return Text(
-      _openUntil == null ? label : '$label · Until $_openUntil',
+      'Until $_openUntil',
       style: GoogleFonts.plusJakartaSans(
         fontSize: 12.5,
         fontWeight: FontWeight.w500,

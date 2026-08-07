@@ -32,13 +32,13 @@ from the Places API when a spot is rendered.
 | D7 | Follows + activity feed, photos on spots and entries | Modeled; want-to-go lists and likes/comments are **not** |
 | D8 | Hours pulled live from Places, never stored | No `hours` column anywhere; `openUntil` is a response field, not a database field |
 | D9 | Manual entry is allowed alongside Places | `google_place_id` is **nullable** with a unique index only where present; `latitude`/`longitude` are nullable too |
+| D10 | `spots.type` replaced by a standardized, moderated tag system (2026-08-06) | `labels` + `spot_entry_tags` + `spot_tag_counts`; tags are per-entry (like `group_study`), aggregated onto the spot; new labels need `users.is_admin` approval before they're usable |
 
 ### Why D9 exists
 
 D4 originally said `NOT NULL UNIQUE`. That would have made half the app's own use case
 unaddable: a campus study room, a specific library floor, or the quiet corner of a
-building simply isn't a Google Place. `SpotType.campus` exists in the theme, so the
-schema has to be able to hold one.
+building simply isn't a Google Place — that kind of spot still has to fit the schema.
 
 The unique index is partial (`WHERE google_place_id IS NOT NULL`), so every
 Places-backed spot still dedupes exactly as designed, while manually entered spots don't
@@ -48,13 +48,35 @@ Place ID is rejected.
 A manual spot has no coordinates — we don't geocode typed addresses — so it won't appear
 on the Map tab until someone links it to a real place.
 
+### Why D10 exists
+
+A single required category per spot doesn't support the two things tags are meant to
+do: filtering ("show me quiet spots"), which needs multiple values per spot, not one;
+and eventually recommending, which needs a signal that comes from many users'
+opinions, not one person's category pick at add-spot time. Modeling tags the same way
+as `group_study` — one user's call per entry, aggregated onto the spot — fits both
+without inventing a new pattern.
+
+Moderation (`users.is_admin`, `labels.status`) exists because "standardized" is the
+whole point — an unmoderated free-text field gives you `#cozy`, `#Cozy`, and
+`#cozyvibes` as three different tags, which defeats filtering and recommending just as
+completely as no tags at all.
+
 ## What's built
 
 v1 is in. `users`, `spots`, and `spot_entries` exist, with the add-spot and
-delete-my-rating flows working end to end.
+delete-my-rating flows working end to end. Auth (see "Still open" #1) and the
+`labels`/tag system (D10) are also built.
 
 `follows`, `photos`, and `activity_events` are designed in this folder but **not built**
 — they're v2/v3 in the build order below. [schema.sql](schema.sql) marks which is which.
+
+**Deferred fast-follows on the tag system, tracked here so they aren't silently
+dropped**: an admin UI in the Flutter app (moderation is curl-only today, see
+[api-contracts.md](api-contracts.md)), a spot-wide tag-cloud in the detail sheet (the
+sheet shows my-own tags only), a server-side filter-by-tag endpoint (filtering is
+100% client-side today, same as the old `type` filter was), and a way to reopen a
+`rejected` label slug (currently a manual DB edit).
 
 ## Still open
 

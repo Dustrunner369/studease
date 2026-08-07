@@ -3,8 +3,9 @@
 -- REFERENCE ONLY. EF Core migrations in backend/Migrations are the source of truth;
 -- this file is what those migrations should produce. Keep them in step.
 --
--- STATUS: users, spots and spot_entries are BUILT and verified against Postgres 15.
--- follows, photos and activity_events are DESIGNED ONLY — v2/v3 in the build order.
+-- STATUS: users, spots, spot_entries, labels, spot_entry_tags and spot_tag_counts are
+-- BUILT and verified against Postgres 15. follows, photos and activity_events are
+-- DESIGNED ONLY — v2/v3 in the build order.
 --
 -- Conventions: snake_case, uuid PKs (UUIDv7 minted by the app), timestamptz in UTC,
 -- enums as text + CHECK. See data-model.md for the reasoning behind each.
@@ -24,6 +25,10 @@ CREATE TABLE users (
     avatar_url     text,
     bio            text,
     is_private     boolean     NOT NULL DEFAULT false,
+    -- The schema's first permission field, deliberately minimal: one boolean gating
+    -- the label-moderation endpoints. Not a roles table; no self-serve way to become
+    -- admin, promotion is a manual UPDATE.
+    is_admin       boolean     NOT NULL DEFAULT false,
     created_at     timestamptz NOT NULL DEFAULT now(),
     updated_at     timestamptz NOT NULL DEFAULT now(),
     deleted_at     timestamptz,
@@ -69,8 +74,8 @@ CREATE TABLE spots (
     utc_offset_minutes integer,
     places_synced_at  timestamptz,
 
-    -- Derived from Places `types` at creation, then user-editable.
-    type              text        NOT NULL DEFAULT 'cafe',
+    -- No type column: replaced by the global label/tag system below (decision D10,
+    -- 2026-08-06). Tags are per-entry (spot_entry_tags), aggregated onto spot_tag_counts.
 
     added_by          uuid        REFERENCES users (id) ON DELETE SET NULL,
     created_at        timestamptz NOT NULL DEFAULT now(),
@@ -91,7 +96,6 @@ CREATE TABLE spots (
     -- NOTE: deliberately no opening-hours column. Hours are fetched live from the
     -- Places API at render time (decision D8).
 
-    CONSTRAINT spots_type_valid  CHECK (type IN ('cafe', 'library', 'campus', 'other')),
     CONSTRAINT spots_price_range CHECK (price_level IS NULL OR price_level BETWEEN 0 AND 4),
     CONSTRAINT spots_lat_range   CHECK (latitude  IS NULL OR latitude  BETWEEN  -90 AND  90),
     CONSTRAINT spots_lng_range   CHECK (longitude IS NULL OR longitude BETWEEN -180 AND 180)
@@ -102,7 +106,6 @@ CREATE TABLE spots (
 CREATE UNIQUE INDEX spots_google_place_id_key ON spots (google_place_id)
     WHERE google_place_id IS NOT NULL;
 
-CREATE INDEX spots_type_idx    ON spots (type);
 -- Good enough for bounding-box "spots near me". If the Map tab needs true radius
 -- search or distance sorting, add PostGIS: a geography(Point,4326) column with a
 -- GiST index. Don't bother until the map is real.
@@ -167,6 +170,80 @@ CREATE TABLE spot_entries (
 CREATE INDEX spot_entries_user_score_idx ON spot_entries (user_id, score DESC, updated_at DESC);
 -- Drives a spot's detail sheet: who else rated this.
 CREATE INDEX spot_entries_spot_idx       ON spot_entries (spot_id) WHERE visibility <> 'private';
+
+-- ---------------------------------------------------------------------------
+-- labels — the standardized, global tag vocabulary that replaced spots.type
+-- (decision D10, 2026-08-06)
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE labels (
+    id            uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+
+    -- Lowercase alphanumeric only, no separators — hashtag-shaped ("#cozy",
+    -- "#bestforreading"), deliberately not kebab-case. A hyphen breaks the #slug
+    -- rendering everywhere this shows up, the way #best-for-reading reads as broken
+    -- on every platform that has hashtags. "Best for reading" -> "bestforreading".
+    slug          text        NOT NULL,
+    -- The human-readable form, as typed — can't be losslessly reconstructed from
+    -- slug, so stored separately. Mainly seen in the moderation queue.
+    display_name  text        NOT NULL,
+
+    -- pending until an admin reviews it. Only approved labels are usable — in the
+    -- picker, or as a tagSlugs value on PUT .../entry.
+    status        text        NOT NULL DEFAULT 'pending',
+
+    requested_by  uuid        REFERENCES users (id) ON DELETE SET NULL,
+    -- Set on rejection too, not only approval — "who reviewed this".
+    approved_by   uuid        REFERENCES users (id) ON DELETE SET NULL,
+
+    created_at    timestamptz NOT NULL DEFAULT now(),
+    updated_at    timestamptz NOT NULL DEFAULT now(),
+
+    CONSTRAINT labels_slug_format  CHECK (slug ~ '^[a-z0-9]{2,30}$'),
+    CONSTRAINT labels_status_valid CHECK (status IN ('pending', 'approved', 'rejected'))
+);
+
+-- A rejected slug is permanently blocked from being re-requested — no "reconsider"
+-- endpoint; an admin re-opens it by hand-editing the row if it ever matters.
+CREATE UNIQUE INDEX labels_slug_key ON labels (slug);
+
+-- ---------------------------------------------------------------------------
+-- spot_entry_tags — join table: which entries carry which labels. One user's
+-- opinion, like group_study — see spot_entries.group_study above. No columns
+-- beyond the two foreign keys; an entry's own user_id already answers "who tagged
+-- it".
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE spot_entry_tags (
+    spot_entry_id uuid NOT NULL REFERENCES spot_entries (id) ON DELETE CASCADE,
+    label_id      uuid NOT NULL REFERENCES labels (id)       ON DELETE CASCADE,
+
+    PRIMARY KEY (spot_entry_id, label_id)
+);
+
+CREATE INDEX spot_entry_tags_label_idx ON spot_entry_tags (label_id);
+
+-- ---------------------------------------------------------------------------
+-- spot_tag_counts — cached rollup: how many of a spot's (non-private) entries
+-- carry each label. Rebuilt from scratch (delete everything for the spot,
+-- re-derive) in the same recompute pass as spots.avg_*, whenever an entry is
+-- written or deleted. spot_entries (via spot_entry_tags) is the source of truth;
+-- this is derived data, same rule as every other cached aggregate in this file.
+--
+-- Doubles as the feature matrix a future recommender would want (spot x label
+-- weights) — not used for that yet, just a free byproduct of following the
+-- existing aggregate pattern rather than a live JOIN.
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE spot_tag_counts (
+    spot_id     uuid    NOT NULL REFERENCES spots (id)  ON DELETE CASCADE,
+    label_id    uuid    NOT NULL REFERENCES labels (id) ON DELETE CASCADE,
+    entry_count integer NOT NULL,
+
+    PRIMARY KEY (spot_id, label_id)
+);
+
+CREATE INDEX spot_tag_counts_label_idx ON spot_tag_counts (label_id);
 
 -- ---------------------------------------------------------------------------
 -- follows                                                    (DESIGNED, NOT BUILT)

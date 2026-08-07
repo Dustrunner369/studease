@@ -38,24 +38,3 @@ Level levelFor(int rating) {
   if (rating >= 3) return Level.ok;
   return Level.rough;
 }
-
-enum SpotType {
-  cafe('cafe', 'Café', Icons.local_cafe, Color(0xFFFFE8D9), Color(0xFFF4633A)),
-  library('library', 'Library', Icons.menu_book, Color(0xFFDDF3E8), Color(0xFF0BA574)),
-  campus('campus', 'Campus', Icons.school, Color(0xFFECE8FD), Color(0xFF7A5AF8)),
-  other('other', 'Other', Icons.place, Color(0xFFEAECF0), Color(0xFF667085));
-
-  final String api; // the value the API stores in spots.type
-  final String label;
-  final IconData icon;
-  final Color pastel; // circle background
-  final Color accent; // icon color
-  const SpotType(this.api, this.label, this.icon, this.pastel, this.accent);
-}
-
-/// Unknown or missing types fall back to café rather than throwing — a spot the
-/// server categorised in a way this build doesn't know about should still render.
-SpotType spotTypeFromApi(String? value) => SpotType.values.firstWhere(
-      (type) => type.api == value,
-      orElse: () => SpotType.cafe,
-    );

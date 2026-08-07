@@ -26,6 +26,13 @@ public class User : ITimestamped
     // linking keeps the same uid, so it's still the same row and the same auth_subject.
     public bool IsGuest { get; set; }
 
+    // The schema's first permission field, deliberately minimal: one boolean gating
+    // RequireAdminFilter on the label-moderation endpoints. Not a roles table - there's
+    // no self-serve way to become admin, promotion is a manual `UPDATE users SET
+    // is_admin = true`. The seeded dev user is admin so those endpoints are reachable
+    // locally via the dev bypass.
+    public bool IsAdmin { get; set; }
+
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
     public DateTime? DeletedAt { get; set; }

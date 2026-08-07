@@ -31,6 +31,13 @@ public class SpotEntry : ITimestamped
     // not a fact about the place — someone else may disagree on the same spot.
     public bool GroupStudy { get; set; }
 
+    // This entry's tags — one user's opinion, same as GroupStudy. A spot's tags for
+    // filtering/display are the aggregate across every entry's Tags, cached in
+    // SpotTagCount and rebuilt in RecomputeAggregates, same pattern as the avg_*
+    // columns on Spot. Only Approved labels may appear here — enforced in Program.cs
+    // at write time, not by a DB constraint (that would need a cross-table trigger).
+    public List<Label> Tags { get; set; } = [];
+
     // Computed by Postgres as a stored generated column, so the three clients can't
     // disagree about what a spot scores. Read-only here by design.
     //

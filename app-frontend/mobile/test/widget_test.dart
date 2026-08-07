@@ -9,9 +9,17 @@ void main() {
       'entryId': '018f0000-0000-7000-8000-000000000002',
       'name': 'Brew & Books',
       'address': '123 Library Lane, Booktown',
-      'type': 'cafe',
       'score': 8.4,
-      'ratings': {'wifi': 4, 'noise': 5, 'outlets': 4, 'seating': 4, 'coffee': 4},
+      'ratings': {
+        'wifi': 4,
+        'noise': 5,
+        'outlets': 4,
+        'seating': 4,
+        'tableSize': 4,
+        'coffee': 4,
+      },
+      'groupStudy': true,
+      'tags': ['cozy', 'bestforreading'],
       'priceLevel': 2,
       'coffeeOrder': 'Vanilla latte',
       'notes': 'Quiet back room',
@@ -22,9 +30,11 @@ void main() {
       final item = MySpotListItem.fromJson(json);
 
       expect(item.name, 'Brew & Books');
-      expect(item.type, SpotType.cafe);
       expect(item.score, 8.4);
       expect(item.ratings.noise, 5);
+      expect(item.ratings.tableSize, 4);
+      expect(item.groupStudy, isTrue);
+      expect(item.tags, ['cozy', 'bestforreading']);
       expect(item.priceLevel, 2);
     });
 
@@ -33,7 +43,8 @@ void main() {
         ..['address'] = null
         ..['priceLevel'] = null
         ..['coffeeOrder'] = null
-        ..['notes'] = null;
+        ..['notes'] = null
+        ..remove('tags');
 
       final item = MySpotListItem.fromJson(sparse);
 
@@ -41,6 +52,7 @@ void main() {
       expect(item.priceLevel, isNull);
       expect(item.coffeeOrder, isNull);
       expect(item.notes, isNull);
+      expect(item.tags, isEmpty);
     });
   });
 
@@ -50,7 +62,6 @@ void main() {
           'googlePlaceId': 'ChIJN1t_tDeuEmsRUsoyG83frY4',
           'name': 'Brew & Books',
           'address': '123 Library Lane',
-          'type': 'library',
           'priceLevel': null,
           'websiteUrl': null,
           'phone': null,
@@ -59,6 +70,9 @@ void main() {
           'hoursUnavailable': openUntil == null,
           'entryCount': 1,
           'avgScore': 8.4,
+          'tags': [
+            {'slug': 'cozy', 'count': 3},
+          ],
           'myEntry': null,
         };
 
@@ -71,7 +85,9 @@ void main() {
       expect(spot.openUntil, isNull);
       expect(spot.isOpenNow, isNull);
       expect(spot.hoursUnavailable, isTrue);
-      expect(spot.type, SpotType.library);
+      expect(spot.tags, hasLength(1));
+      expect(spot.tags.single.slug, 'cozy');
+      expect(spot.tags.single.count, 3);
     });
 
     test('parses a spot with opening hours', () {
@@ -81,19 +97,13 @@ void main() {
       expect(spot.isOpenNow, isTrue);
       expect(spot.hoursUnavailable, isFalse);
     });
-  });
 
-  group('spotTypeFromApi', () {
-    test('maps every type the API can send', () {
-      expect(spotTypeFromApi('cafe'), SpotType.cafe);
-      expect(spotTypeFromApi('library'), SpotType.library);
-      expect(spotTypeFromApi('campus'), SpotType.campus);
-      expect(spotTypeFromApi('other'), SpotType.other);
-    });
+    test('tolerates a missing tags key', () {
+      final sparse = detail()..remove('tags');
 
-    test('falls back to cafe rather than throwing on an unknown type', () {
-      expect(spotTypeFromApi('spaceship'), SpotType.cafe);
-      expect(spotTypeFromApi(null), SpotType.cafe);
+      final spot = SpotDetail.fromJson(sparse);
+
+      expect(spot.tags, isEmpty);
     });
   });
 

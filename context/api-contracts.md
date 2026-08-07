@@ -72,7 +72,6 @@ responses where a per-row lookup would be too expensive.
   "address": "123 Library Lane, Booktown",
   "latitude": 51.5072,
   "longitude": -0.1276,
-  "type": "cafe",
   "priceLevel": 2,
   "websiteUrl": "https://brewandbooks.example",
   "phone": "+44 20 7123 4567",
@@ -82,6 +81,7 @@ responses where a per-row lookup would be too expensive.
   "entryCount": 12,
   "avgScore": 8.4,
   "avgRatings": { "wifi": 4.2, "noise": 3.8, "outlets": 4.5, "seating": 3.9, "tableSize": 4.1, "coffee": 4.4 },
+  "tags": [ { "slug": "cozy", "count": 8 }, { "slug": "bestforreading", "count": 3 } ],
   "photos": [ { "id": "018f...", "url": "https://...", "width": 1600, "height": 1200 } ]
 }
 ```
@@ -89,8 +89,11 @@ responses where a per-row lookup would be too expensive.
 `hoursUnavailable: true` distinguishes "Google has no hours for this place / the lookup
 failed" from "closed right now". Show "Hours unknown", not "Closed".
 
-`type` is one of `cafe | library | campus | other` and maps to `SpotType` in
-`lib/design/theme.dart`.
+**No `type` field** — removed 2026-08-06 (decision D10), replaced by the standardized
+tag system. `tags` here is the **spot-wide aggregate**: how many of the spot's entries
+carry each label, from `spot_tag_counts`. Everyone's opinion, not just the caller's —
+contrast with `SpotEntry.tags` / `MySpotListItem.tags` below, which are one entry's own
+tags. See `### Label`.
 
 ### `SpotEntry`
 
@@ -105,6 +108,7 @@ client.
   "ratings": { "wifi": 4, "noise": 5, "outlets": 4, "seating": 4, "tableSize": 4, "coffee": 4 },
   "score": 8.4,
   "groupStudy": true,
+  "tags": ["cozy", "bestforreading"],
   "coffeeOrder": "Vanilla latte",
   "notes": "Quiet back room with good lighting.",
   "visibility": "public",
@@ -123,6 +127,10 @@ collected and displayed but deliberately left out: folding in a sixth term would
 every score already stored. `groupStudy` is a boolean verdict, never scoreable, and stays
 one user's opinion — there is no group-study aggregate on `Spot`.
 
+`tags` is this entry's own labels — a flat array of `slug`s, same "one user's opinion"
+status as `groupStudy`. Every slug must name an `approved` `Label` or the write is
+rejected; see `### Label` and `PUT /spots/{spotId}/entry` below.
+
 ### `MySpotListItem`
 
 The Spots tab's list row — a spot joined to my entry, flattened so the row renders
@@ -134,10 +142,10 @@ without a second request. This replaces today's `StudySpot` model in both client
   "entryId": "018f...",
   "name": "Brew & Books",
   "address": "123 Library Lane, Booktown",
-  "type": "cafe",
   "score": 8.4,
   "ratings": { "wifi": 4, "noise": 5, "outlets": 4, "seating": 4, "tableSize": 4, "coffee": 4 },
   "groupStudy": true,
+  "tags": ["cozy", "bestforreading"],
   "priceLevel": 2,
   "coffeeOrder": "Vanilla latte",
   "notes": "Quiet back room with good lighting.",
@@ -152,6 +160,35 @@ No `openUntil` here on purpose: it would cost a Places call per row. The detail 
 fetches it. If the list must show "open now", add `?includeHours=true` and accept the
 latency, or cache hours server-side for a few minutes.
 
+`tags` is this entry's own labels, same as on `SpotEntry` — what drives the client-side
+tag filter on the Spots tab (`_buildFilters` in `main.dart`, options derived from the
+tags actually present across the loaded list, AND semantics across selected tags).
+
+### `Label`
+
+**Built.** The standardized, global tag vocabulary that replaced `Spot.type` (decision
+D10, 2026-08-06). Modeled on Beli's Labels.
+
+```json
+{
+  "id": "018f...",
+  "slug": "bestforreading",
+  "displayName": "Best for reading",
+  "status": "approved"
+}
+```
+
+`slug` is normalized: **lowercase alphanumeric only, no separators.** "Best for
+reading" becomes `bestforreading` — deliberately not kebab-case, since labels render
+as `#slug` everywhere (the picker, filter chips, tag pills), and a hyphen breaks that
+the way `#best-for-reading` reads as broken on every platform that has hashtags.
+
+`status` is `pending | approved | rejected`. Only `approved` labels appear from
+`GET /labels` or validate as a `tagSlugs` entry on `PUT /spots/{spotId}/entry`. A new
+label starts `pending` and needs an admin to approve it — see "Labels & moderation"
+below. There is no notification when that happens; the requester finds out by checking
+`GET /labels` later, same as anyone else.
+
 ### `ActivityItem`
 
 ```json
@@ -159,7 +196,7 @@ latency, or cache hours server-side for a few minutes.
   "id": "018f...",
   "verb": "rated_spot",
   "actor": { "id": "018f...", "handle": "sam", "displayName": "Sam", "avatarUrl": null },
-  "spot": { "id": "018f...", "name": "Brew & Books", "type": "cafe" },
+  "spot": { "id": "018f...", "name": "Brew & Books" },
   "entry": { "id": "018f...", "score": 8.4, "notes": "Great back room" },
   "targetUser": null,
   "photos": [],
@@ -182,9 +219,10 @@ latency, or cache hours server-side for a few minutes.
 | `GET` | `/spots/{id}/entries` | Other users' entries for this spot, respecting visibility. Paginated. |
 
 `POST /spots` takes **either** `{ "googlePlaceId": "..." }` — the normal path — **or**
-`{ "name": "...", "address": "...", "type": "campus" }` for a place Google doesn't know
-about (decision D9). What it never accepts is ratings: those arrive separately as an
-entry, because they belong to one user and the spot belongs to everyone.
+`{ "name": "...", "address": "..." }` for a place Google doesn't know about (decision
+D9). What it never accepts is ratings: those arrive separately as an entry, because
+they belong to one user and the spot belongs to everyone. No `type` field — spots
+aren't categorized anymore, see `### Label`.
 
 When `Places:ApiKey` isn't configured, `GET /places/search` returns `503` with a
 problem+json explaining why. The Flutter sheet treats that as "switch to manual entry"
@@ -204,6 +242,7 @@ rather than an error, so the add flow works with or without a Google key.
 {
   "ratings": { "wifi": 4, "noise": 5, "outlets": 4, "seating": 4, "tableSize": 4, "coffee": 4 },
   "groupStudy": true,
+  "tagSlugs": ["cozy", "bestforreading"],
   "coffeeOrder": "Vanilla latte",
   "notes": "Quiet back room with good lighting.",
   "visibility": "public"
@@ -215,6 +254,12 @@ optional; sending `null` clears them. `score` is rejected if present.
 
 `groupStudy` is optional and defaults to `false`, so a client that predates the field
 still saves rather than getting a `400`.
+
+`tagSlugs` is optional and defaults to no tags. Every slug present must name an
+`approved` `Label` — an unknown or not-yet-approved slug fails the **whole** write with
+`400` (`Results.ValidationProblem`, same status as a bad rating), not just that one tag.
+Sending `tagSlugs` replaces the entry's tags wholesale, same as every other field here —
+it is not a diff.
 
 **Guests are capped at 3 entries.** The count only includes *new* spots — re-rating one
 already rated is always an update, never blocked. Past the cap, `PUT` returns `403` with:
@@ -240,6 +285,25 @@ yet (`registration-required`) is also a `403` and means something different. See
 **Not built:** `GET /users/handle-available` (client validates the pattern locally and
 just handles the `409` from `POST /me`), `PATCH /me`, `DELETE /me`.
 
+### Labels & moderation
+
+**Built** (backend + Flutter tag picker; no Flutter admin UI — see below).
+
+| Method | Path | Notes |
+| --- | --- | --- |
+| `GET` | `/labels` | `Label[]`, `status: "approved"` only, ordered by slug. The tag picker's data source. |
+| `POST` | `/labels` | Body `{ "name": "..." }`. Idempotent-ish: dedupes to an existing `approved` or `pending` label by slug (`200`, no duplicate created) rather than erroring; a slug matching a `rejected` label is `409`; a new slug is `201` with `status: "pending"`. `400` if the name normalizes to fewer than 2 alphanumeric characters. |
+| `GET` | `/admin/labels/pending` | `PendingLabelDto[]` — `{ id, slug, displayName, requestedBy, createdAt }`. **Admin only.** |
+| `POST` | `/admin/labels/{id}/approve` | Flips `status` to `approved`. **Admin only.** |
+| `POST` | `/admin/labels/{id}/reject` | Flips `status` to `rejected` — permanent, no "reconsider" endpoint. **Admin only.** |
+
+"Admin only" means `users.is_admin = true`; a non-admin caller gets `403`. There is
+**no admin UI in the Flutter app** — moderation happens via curl, either against a real
+account with `is_admin` hand-set in Postgres, or locally against the dev-bypass
+identity (seeded as admin, so these three routes work with no `Authorization` header
+at all when `Auth:AllowDevBypass` is on). See `RequireAdminFilter` in the backend,
+which checks the resolved `User.IsAdmin`.
+
 ### Social
 
 | Method | Path | Notes |
@@ -257,6 +321,13 @@ just handles the `409` from `POST /me`), `PATCH /me`, `DELETE /me`.
 | `DELETE` | `/photos/{id}` | Soft delete; uploader or spot owner only. |
 
 ## Client status
+
+**Flutter — tags built 2026-08-06.** `SpotType` is gone from `theme.dart`; `main.dart`'s
+category circle is one fixed neutral icon now (spots no longer have a single category
+to color-code by), and the old single-select type filter is a multi-select tag filter
+sourced from whatever tags are actually on the loaded list. `add_spot_sheet.dart`'s
+type picker is a tag picker (`GET /labels`) plus an inline "suggest a new tag" field
+(`POST /labels`). No admin UI — see "Labels & moderation" above.
 
 **Flutter — auth built 2026-08-06.** Every request now carries a Firebase ID token
 (`api_service.dart`'s `_headers()`), including a guest's anonymous one, with a single

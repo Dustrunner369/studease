@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart' show defaultTargetPlatform, kIsWeb, TargetPlatform;
 import 'package:http/http.dart' as http;
-import 'package:mobile/design/theme.dart';
+import 'package:mobile/models/label.dart';
 import 'package:mobile/models/me.dart';
 import 'package:mobile/models/spot.dart';
 
@@ -114,11 +114,11 @@ Future<List<PlaceSuggestion>> searchPlaces(String query) async {
 ///
 /// Pass [googlePlaceId] for a real place; pass [name] to enter one by hand when
 /// Google doesn't know about it (campus study rooms usually don't exist in Places).
+/// No category — spots aren't typed anymore, see the tag/label system below.
 Future<SpotDetail> createSpot({
   String? googlePlaceId,
   String? name,
   String? address,
-  required SpotType type,
 }) async {
   final data = await _send((headers) => http.post(
         Uri.parse('$baseUrl/spots'),
@@ -127,7 +127,6 @@ Future<SpotDetail> createSpot({
           'googlePlaceId': googlePlaceId,
           'name': name,
           'address': address,
-          'type': type.api,
         }),
       ));
 
@@ -138,11 +137,13 @@ Future<SpotDetail> createSpot({
 /// than adding a second one, so this doubles as the edit call.
 ///
 /// Guests get a 403 (ApiException.isGuestLimitReached) past their third *new* spot —
-/// re-rating a spot already rated never counts against the cap.
+/// re-rating a spot already rated never counts against the cap. Every slug in
+/// [tagSlugs] must resolve to an approved label or the whole write 400s.
 Future<SpotEntry> saveEntry({
   required String spotId,
   required Ratings ratings,
   bool groupStudy = false,
+  List<String> tagSlugs = const [],
   String? coffeeOrder,
   String? notes,
 }) async {
@@ -152,6 +153,7 @@ Future<SpotEntry> saveEntry({
         body: json.encode({
           'ratings': ratings.toJson(),
           'groupStudy': groupStudy,
+          'tagSlugs': tagSlugs,
           'coffeeOrder': coffeeOrder,
           'notes': notes,
         }),
@@ -163,6 +165,27 @@ Future<SpotEntry> saveEntry({
 /// Removes my rating. The spot survives — someone else may have rated it too.
 Future<void> deleteEntry(String spotId) async {
   await _send((headers) => http.delete(Uri.parse('$baseUrl/spots/$spotId/entry'), headers: headers));
+}
+
+/// The tag picker's data source: only the standardized, moderated vocabulary.
+Future<List<Label>> fetchLabels() async {
+  final data = await _send((headers) => http.get(Uri.parse('$baseUrl/labels'), headers: headers));
+
+  return (data as List<dynamic>)
+      .map((item) => Label.fromJson(item as Map<String, dynamic>))
+      .toList();
+}
+
+/// Proposes a new tag. Returns immediately usable if it dedupes to an
+/// already-approved label; otherwise it's pending until an admin reviews it.
+Future<Label> requestLabel(String name) async {
+  final data = await _send((headers) => http.post(
+        Uri.parse('$baseUrl/labels'),
+        headers: headers,
+        body: json.encode({'name': name}),
+      ));
+
+  return Label.fromJson(data as Map<String, dynamic>);
 }
 
 Future<dynamic> _send(Future<http.Response> Function(Map<String, String> headers) request) async {

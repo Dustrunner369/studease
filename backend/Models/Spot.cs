@@ -1,30 +1,5 @@
 namespace study_spot_backend.Models;
 
-public static class SpotTypes
-{
-    public const string Cafe = "cafe";
-    public const string Library = "library";
-    public const string Campus = "campus";
-    public const string Other = "other";
-
-    public static readonly string[] All = [Cafe, Library, Campus, Other];
-
-    public static bool IsValid(string? value) => value is not null && All.Contains(value);
-
-    // Google's place types don't have a "study spot" notion, so we map the ones that
-    // matter and let everything else fall through to café — the common case.
-    public static string FromGoogleTypes(IEnumerable<string>? googleTypes)
-    {
-        var types = googleTypes?.ToHashSet() ?? [];
-
-        if (types.Contains("library")) return Library;
-        if (types.Contains("university") || types.Contains("school")) return Campus;
-        if (types.Contains("cafe") || types.Contains("coffee_shop")) return Cafe;
-
-        return Cafe;
-    }
-}
-
 // One row per real-world place, shared by every user. Facts about the place live
 // here; what any one person thinks of it lives on SpotEntry.
 public class Spot : ITimestamped
@@ -54,8 +29,6 @@ public class Spot : ITimestamped
     public int? UtcOffsetMinutes { get; set; }
     public DateTime? PlacesSyncedAt { get; set; }
 
-    public string Type { get; set; } = SpotTypes.Cafe;
-
     public Guid? AddedBy { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
@@ -76,6 +49,11 @@ public class Spot : ITimestamped
 
     // NOTE: deliberately no opening-hours columns. Hours are fetched live from the
     // Places API when a spot is rendered (decision D8 in context/README.md).
+
+    // NOTE: no Type column (removed 2026-08-06) — replaced by the global label/tag
+    // system. Tag aggregation for a spot lives in SpotTagCount, not an inline column
+    // here, because tag cardinality is variable, unlike the six fixed rating categories
+    // above.
 
     public List<SpotEntry> Entries { get; set; } = [];
 }

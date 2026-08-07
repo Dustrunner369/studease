@@ -4,13 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:mobile/design/theme.dart';
 import 'package:mobile/features/authentication/presentation/login_page.dart';
+import 'package:mobile/models/label.dart';
 import 'package:mobile/models/me.dart';
 import 'package:mobile/models/spot.dart';
 import 'package:mobile/services/api_service.dart';
 import 'package:mobile/services/auth_controller.dart';
 
-/// Slides the add-spot form up from the bottom. Resolves to true when a spot was
-/// saved, so the caller knows to reload the list.
 Future<bool?> showAddSpotSheet(BuildContext context, AuthController auth) {
   return showModalBottomSheet<bool>(
     context: context,
@@ -35,6 +34,7 @@ class _AddSpotSheetState extends State<AddSpotSheet> {
   final _addressController = TextEditingController();
   final _orderController = TextEditingController();
   final _notesController = TextEditingController();
+  final _labelRequestController = TextEditingController();
 
   PlaceSuggestion? _selectedPlace;
   List<PlaceSuggestion> _suggestions = [];
@@ -46,7 +46,12 @@ class _AddSpotSheetState extends State<AddSpotSheet> {
   bool _manualEntry = false;
   String? _searchNotice;
 
-  SpotType _type = SpotType.cafe;
+  // The standardized vocabulary (approved labels only), and which of them this
+  // entry carries. Optional — unlike the ratings below, an untagged spot still saves.
+  List<Label> _availableLabels = [];
+  final Set<String> _selectedTagSlugs = {};
+  bool _requestingLabel = false;
+  String? _labelRequestNotice;
 
   int? _wifi;
   int? _quiet;
@@ -67,6 +72,7 @@ class _AddSpotSheetState extends State<AddSpotSheet> {
     super.initState();
     // The save button enables as soon as a name exists, so it has to track typing.
     _nameController.addListener(_onFormChanged);
+    _loadLabels();
   }
 
   @override
@@ -78,7 +84,19 @@ class _AddSpotSheetState extends State<AddSpotSheet> {
     _addressController.dispose();
     _orderController.dispose();
     _notesController.dispose();
+    _labelRequestController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadLabels() async {
+    try {
+      final labels = await fetchLabels();
+      if (!mounted) return;
+      setState(() => _availableLabels = labels);
+    } catch (_) {
+      // Tags are optional — a failed lookup just leaves the picker empty. The
+      // request field below still works independently of this.
+    }
   }
 
   void _onFormChanged() => setState(() {});
@@ -143,6 +161,44 @@ class _AddSpotSheetState extends State<AddSpotSheet> {
     }
   }
 
+  Future<void> _requestLabel() async {
+    final name = _labelRequestController.text.trim();
+    if (name.isEmpty) return;
+
+    setState(() {
+      _requestingLabel = true;
+      _labelRequestNotice = null;
+    });
+
+    try {
+      final label = await requestLabel(name);
+      if (!mounted) return;
+
+      setState(() {
+        _requestingLabel = false;
+        _labelRequestController.clear();
+
+        if (label.status == 'approved') {
+          // Dedupe hit on an already-approved label — usable immediately.
+          if (!_availableLabels.any((l) => l.id == label.id)) {
+            _availableLabels = [..._availableLabels, label]
+              ..sort((a, b) => a.slug.compareTo(b.slug));
+          }
+          _selectedTagSlugs.add(label.slug);
+          _labelRequestNotice = "#${label.slug} already exists — added it.";
+        } else {
+          _labelRequestNotice = "#${label.slug} submitted for review — usable once approved.";
+        }
+      });
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _requestingLabel = false;
+        _labelRequestNotice = e.message;
+      });
+    }
+  }
+
   void _selectPlace(PlaceSuggestion place) {
     FocusScope.of(context).unfocus();
     setState(() {
@@ -165,7 +221,6 @@ class _AddSpotSheetState extends State<AddSpotSheet> {
         googlePlaceId: _selectedPlace?.googlePlaceId,
         name: _selectedPlace == null ? _nameController.text.trim() : null,
         address: _selectedPlace == null ? _trimmedOrNull(_addressController) : null,
-        type: _type,
       );
 
       await saveEntry(
@@ -179,6 +234,7 @@ class _AddSpotSheetState extends State<AddSpotSheet> {
           coffee: _coffee!,
         ),
         groupStudy: _groupStudy,
+        tagSlugs: _selectedTagSlugs.toList(),
         coffeeOrder: _trimmedOrNull(_orderController),
         notes: _trimmedOrNull(_notesController),
       );
@@ -294,9 +350,13 @@ class _AddSpotSheetState extends State<AddSpotSheet> {
                         else
                           _buildSearch(),
                         const SizedBox(height: 22),
-                        _buildSectionLabel('TYPE'),
+                        _buildSectionLabel('TAGS'),
                         const SizedBox(height: 10),
-                        _buildTypePicker(),
+                        if (_availableLabels.isNotEmpty) ...[
+                          _buildTagPicker(),
+                          const SizedBox(height: 12),
+                        ],
+                        _buildLabelRequest(),
                         const SizedBox(height: 22),
                         _buildSectionLabel('RATE IT'),
                         const SizedBox(height: 4),
@@ -603,41 +663,90 @@ class _AddSpotSheetState extends State<AddSpotSheet> {
     );
   }
 
-  Widget _buildTypePicker() {
+  // Text-only pills, no icon — arbitrary tags have no fixed icon set, unlike the old
+  // per-type picker this replaces. Same chip shape/color language as the filter chips
+  // in main.dart's _buildFilters, just tappable-to-select instead of tappable-to-filter.
+  Widget _buildTagPicker() {
     return Wrap(
       spacing: 8,
       runSpacing: 8,
       children: [
-        for (final type in SpotType.values)
+        for (final label in _availableLabels)
           GestureDetector(
-            onTap: () => setState(() => _type = type),
+            onTap: () => setState(() {
+              if (!_selectedTagSlugs.remove(label.slug)) _selectedTagSlugs.add(label.slug);
+            }),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
               decoration: BoxDecoration(
-                color: _type == type ? Tone.ink : Tone.field,
+                color: _selectedTagSlugs.contains(label.slug) ? Tone.ink : Tone.field,
                 borderRadius: BorderRadius.circular(999),
               ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    type.icon,
-                    size: 15,
-                    color: _type == type ? Colors.white : Tone.muted,
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    type.label,
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: _type == type ? Colors.white : Tone.muted,
-                    ),
-                  ),
-                ],
+              child: Text(
+                '#${label.slug}',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: _selectedTagSlugs.contains(label.slug) ? Colors.white : Tone.muted,
+                ),
               ),
             ),
           ),
+      ],
+    );
+  }
+
+  // Don't see the tag you want? Propose it — moderated, so it isn't usable (by
+  // anyone, including whoever asked) until an admin approves it. Mirrors the
+  // "Can't find it? Add it by hand" affordance above for places.
+  Widget _buildLabelRequest() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: _TextField(controller: _labelRequestController, hint: 'Suggest a new tag'),
+            ),
+            const SizedBox(width: 8),
+            GestureDetector(
+              onTap: _requestingLabel ? null : _requestLabel,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+                decoration: BoxDecoration(
+                  color: Tone.field,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: _requestingLabel
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Tone.muted),
+                      )
+                    : Text(
+                        'Suggest',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: Tone.teal,
+                        ),
+                      ),
+              ),
+            ),
+          ],
+        ),
+        if (_labelRequestNotice != null) ...[
+          const SizedBox(height: 8),
+          Text(
+            _labelRequestNotice!,
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 12.5,
+              fontWeight: FontWeight.w500,
+              color: Tone.muted,
+            ),
+          ),
+        ],
       ],
     );
   }

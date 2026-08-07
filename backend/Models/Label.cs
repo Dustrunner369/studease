@@ -1,0 +1,43 @@
+namespace study_spot_backend.Models;
+
+public static class LabelStatuses
+{
+    public const string Pending = "pending";
+    public const string Approved = "approved";
+    public const string Rejected = "rejected";
+
+    public static readonly string[] All = [Pending, Approved, Rejected];
+
+    public static bool IsValid(string? value) => value is not null && All.Contains(value);
+}
+
+// One entry in the standardized, global tag vocabulary — replaces the old per-spot
+// Type. Applied per SpotEntry (one user's opinion, see SpotEntry.Tags), never directly
+// on Spot. A user requests a label by name; it starts Pending and is unusable until an
+// admin approves it, which is what keeps the vocabulary standardized enough to filter
+// and, eventually, recommend on.
+public class Label : ITimestamped
+{
+    public Guid Id { get; set; }
+
+    // Normalized: lowercase alphanumeric only, no separators — "Best for reading"
+    // becomes "bestforreading". Hashtag-shaped on purpose (the feature is modeled on
+    // Beli's Labels, and the user's own examples were #cozy / #bestforreading, not
+    // kebab-case) — a hyphen would break the #slug rendering the picker and filter
+    // chips do. See ck_labels_slug_format in AppDbContext.
+    public required string Slug { get; set; }
+
+    // The human-readable form, as typed. Can't be losslessly reconstructed from Slug,
+    // so it's stored separately — mainly seen in the moderation queue.
+    public required string DisplayName { get; set; }
+
+    public string Status { get; set; } = LabelStatuses.Pending;
+
+    public Guid? RequestedBy { get; set; }
+    public Guid? ApprovedBy { get; set; } // set on reject too — "who reviewed this"
+
+    public DateTime CreatedAt { get; set; }
+    public DateTime UpdatedAt { get; set; }
+
+    public List<SpotEntry> Entries { get; set; } = [];
+}

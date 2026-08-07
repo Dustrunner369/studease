@@ -12,6 +12,8 @@ namespace study_spot_backend
         public DbSet<User> Users => Set<User>();
         public DbSet<Spot> Spots => Set<Spot>();
         public DbSet<SpotEntry> SpotEntries => Set<SpotEntry>();
+        public DbSet<Label> Labels => Set<Label>();
+        public DbSet<SpotTagCount> SpotTagCounts => Set<SpotTagCount>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -22,6 +24,7 @@ namespace study_spot_backend
 
                 entity.Property(u => u.Handle).HasMaxLength(30);
                 entity.Property(u => u.IsGuest).HasDefaultValue(false);
+                entity.Property(u => u.IsAdmin).HasDefaultValue(false);
 
                 entity.ToTable(t =>
                 {
@@ -39,6 +42,9 @@ namespace study_spot_backend
                     DisplayName = "Dev User",
                     AuthProvider = "dev",
                     AuthSubject = "local",
+                    // Admin so the label-moderation endpoints are reachable locally via the
+                    // dev bypass with no Authorization header at all.
+                    IsAdmin = true,
                     // Fixed, not DateTime.UtcNow: seed data goes into a migration, and a
                     // migration has to produce the same SQL every time it's generated.
                     CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
@@ -54,9 +60,6 @@ namespace study_spot_backend
                     .IsUnique()
                     .HasFilter("google_place_id IS NOT NULL");
 
-                entity.HasIndex(s => s.Type);
-
-                entity.Property(s => s.Type).HasMaxLength(16);
                 entity.Property(s => s.AvgScore).HasColumnType("numeric(3,1)");
                 entity.Property(s => s.AvgWifi).HasColumnType("numeric(2,1)");
                 entity.Property(s => s.AvgNoise).HasColumnType("numeric(2,1)");
@@ -72,8 +75,6 @@ namespace study_spot_backend
 
                 entity.ToTable(t =>
                 {
-                    t.HasCheckConstraint("ck_spots_type_valid",
-                        "type IN ('cafe', 'library', 'campus', 'other')");
                     t.HasCheckConstraint("ck_spots_price_range",
                         "price_level IS NULL OR price_level BETWEEN 0 AND 4");
                     t.HasCheckConstraint("ck_spots_lat_range",
@@ -81,6 +82,54 @@ namespace study_spot_backend
                     t.HasCheckConstraint("ck_spots_lng_range",
                         "longitude IS NULL OR longitude BETWEEN -180 AND 180");
                 });
+            });
+
+            modelBuilder.Entity<Label>(entity =>
+            {
+                entity.HasIndex(l => l.Slug).IsUnique();
+                entity.Property(l => l.Slug).HasMaxLength(30);
+
+                entity.HasOne<User>()
+                    .WithMany()
+                    .HasForeignKey(l => l.RequestedBy)
+                    .OnDelete(DeleteBehavior.SetNull);
+
+                entity.HasOne<User>()
+                    .WithMany()
+                    .HasForeignKey(l => l.ApprovedBy)
+                    .OnDelete(DeleteBehavior.SetNull);
+
+                // Configured explicitly (not left to EF's auto-derived join) so the
+                // table name and columns land deliberately. No extra columns on the
+                // join itself — an entry's own UserId already answers "who tagged it".
+                entity.HasMany(l => l.Entries)
+                    .WithMany(e => e.Tags)
+                    .UsingEntity(j => j.ToTable("spot_entry_tags"));
+
+                entity.ToTable(t =>
+                {
+                    t.HasCheckConstraint("ck_labels_status_valid",
+                        "status IN ('pending', 'approved', 'rejected')");
+                    // Alphanumeric only, no separators - hashtag-shaped to match how
+                    // slugs render as #cozy in the picker/filter chips. A hyphen would
+                    // break that the way #best-for-reading reads as broken elsewhere.
+                    t.HasCheckConstraint("ck_labels_slug_format", "slug ~ '^[a-z0-9]{2,30}$'");
+                });
+            });
+
+            modelBuilder.Entity<SpotTagCount>(entity =>
+            {
+                entity.HasKey(x => new { x.SpotId, x.LabelId });
+
+                entity.HasOne(x => x.Spot)
+                    .WithMany()
+                    .HasForeignKey(x => x.SpotId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(x => x.Label)
+                    .WithMany()
+                    .HasForeignKey(x => x.LabelId)
+                    .OnDelete(DeleteBehavior.Cascade);
             });
 
             modelBuilder.Entity<SpotEntry>(entity =>

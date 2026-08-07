@@ -237,6 +237,111 @@ api.MapPost("/me", async (RegisterRequest request, CurrentUser currentUser, AppD
 });
 
 // ---------------------------------------------------------------------------
+// Labels
+// ---------------------------------------------------------------------------
+
+// The picker's data source: only the standardized, moderated vocabulary. Guests get
+// this too (RequireRegisteredFilter passes them via auto-provisioning).
+registered.MapGet("/labels", async (AppDbContext db, CancellationToken ct) =>
+    await db.Labels
+        .Where(l => l.Status == LabelStatuses.Approved)
+        .OrderBy(l => l.Slug)
+        .Select(l => new LabelDto(l.Id, l.Slug, l.DisplayName, l.Status))
+        .ToListAsync(ct));
+
+// Requests a new label. Idempotent by slug, same shape as POST /spots: an existing
+// approved or still-pending label is returned rather than duplicated. A previously
+// rejected slug is a 409 rather than silently resurrecting it - no "reconsider"
+// endpoint this pass, an admin re-opens it by hand-editing the row.
+registered.MapPost("/labels", async (
+    RequestLabelRequest request, CurrentUser currentUser, AppDbContext db, CancellationToken ct) =>
+{
+    var slug = Slugify(request.Name);
+    var displayName = request.Name?.Trim();
+
+    if (string.IsNullOrWhiteSpace(displayName) || !Regex.IsMatch(slug, @"^[a-z0-9]{2,30}$"))
+    {
+        return Results.ValidationProblem(new Dictionary<string, string[]>
+        {
+            ["name"] = ["Give the tag a name with at least 2 letters or numbers in it."],
+        });
+    }
+
+    var existing = await db.Labels.FirstOrDefaultAsync(l => l.Slug == slug, ct);
+
+    if (existing is not null)
+    {
+        if (existing.Status == LabelStatuses.Rejected)
+        {
+            return Results.Problem(
+                title: "That tag was already reviewed and rejected",
+                statusCode: StatusCodes.Status409Conflict);
+        }
+
+        return Results.Ok(new LabelDto(existing.Id, existing.Slug, existing.DisplayName, existing.Status));
+    }
+
+    var requestedBy = await currentUser.IdAsync(ct);
+
+    var created = new Label
+    {
+        Id = Guid.CreateVersion7(),
+        Slug = slug,
+        DisplayName = displayName,
+        Status = LabelStatuses.Pending,
+        RequestedBy = requestedBy,
+    };
+
+    db.Labels.Add(created);
+    await db.SaveChangesAsync(ct);
+
+    return Results.Created(
+        $"/labels/{created.Id}",
+        new LabelDto(created.Id, created.Slug, created.DisplayName, created.Status));
+});
+
+// ---------------------------------------------------------------------------
+// Admin — label moderation. No client UI: exercised via curl, either against a real
+// account with is_admin hand-set, or locally against the dev-bypass identity (seeded
+// as admin). See RequireAdminFilter.
+// ---------------------------------------------------------------------------
+
+var admin = registered.MapGroup("").AddEndpointFilter<RequireAdminFilter>();
+
+admin.MapGet("/admin/labels/pending", async (AppDbContext db, CancellationToken ct) =>
+    await db.Labels
+        .Where(l => l.Status == LabelStatuses.Pending)
+        .OrderBy(l => l.CreatedAt)
+        .Select(l => new PendingLabelDto(l.Id, l.Slug, l.DisplayName, l.RequestedBy, l.CreatedAt))
+        .ToListAsync(ct));
+
+admin.MapPost("/admin/labels/{id:guid}/approve", async (
+    Guid id, CurrentUser currentUser, AppDbContext db, CancellationToken ct) =>
+{
+    var label = await db.Labels.FirstOrDefaultAsync(l => l.Id == id, ct);
+    if (label is null) return Results.NotFound();
+
+    label.Status = LabelStatuses.Approved;
+    label.ApprovedBy = await currentUser.IdAsync(ct);
+    await db.SaveChangesAsync(ct);
+
+    return Results.Ok(new LabelDto(label.Id, label.Slug, label.DisplayName, label.Status));
+});
+
+admin.MapPost("/admin/labels/{id:guid}/reject", async (
+    Guid id, CurrentUser currentUser, AppDbContext db, CancellationToken ct) =>
+{
+    var label = await db.Labels.FirstOrDefaultAsync(l => l.Id == id, ct);
+    if (label is null) return Results.NotFound();
+
+    label.Status = LabelStatuses.Rejected;
+    label.ApprovedBy = await currentUser.IdAsync(ct);
+    await db.SaveChangesAsync(ct);
+
+    return Results.Ok(new LabelDto(label.Id, label.Slug, label.DisplayName, label.Status));
+});
+
+// ---------------------------------------------------------------------------
 // Spots
 // ---------------------------------------------------------------------------
 
@@ -283,9 +388,6 @@ registered.MapPost("/spots", async (
             Phone = details.Phone,
             UtcOffsetMinutes = details.UtcOffsetMinutes,
             PlacesSyncedAt = DateTime.UtcNow,
-            Type = SpotTypes.IsValid(request.Type)
-                ? request.Type!
-                : SpotTypes.FromGoogleTypes(details.Types),
             AddedBy = userId,
         };
     }
@@ -307,7 +409,6 @@ registered.MapPost("/spots", async (
             Id = Guid.CreateVersion7(),
             Name = request.Name.Trim(),
             FormattedAddress = string.IsNullOrWhiteSpace(request.Address) ? null : request.Address.Trim(),
-            Type = SpotTypes.IsValid(request.Type) ? request.Type! : SpotTypes.Cafe,
             AddedBy = userId,
         };
     }
@@ -333,10 +434,10 @@ registered.MapGet("/me/spots", async (AppDbContext db, CurrentUser currentUser, 
             e.Id,
             e.Spot!.Name,
             e.Spot.FormattedAddress,
-            e.Spot.Type,
             e.Score,
             new RatingsDto(e.Wifi, e.Noise, e.Outlets, e.Seating, e.TableSize, e.Coffee),
             e.GroupStudy,
+            e.Tags.Select(t => t.Slug).ToList(),
             e.Spot.PriceLevel,
             e.CoffeeOrder,
             e.Notes,
@@ -369,6 +470,26 @@ registered.MapPut("/spots/{id:guid}/entry", async (
 
     if (!await db.Spots.AnyAsync(s => s.Id == id, ct)) return Results.NotFound();
 
+    var tagSlugs = (request.TagSlugs ?? [])
+        .Select(s => s.Trim().ToLowerInvariant())
+        .Distinct()
+        .ToList();
+
+    var tags = tagSlugs.Count == 0
+        ? []
+        : await db.Labels
+            .Where(l => tagSlugs.Contains(l.Slug) && l.Status == LabelStatuses.Approved)
+            .ToListAsync(ct);
+
+    if (tags.Count != tagSlugs.Count)
+    {
+        var invalid = tagSlugs.Except(tags.Select(t => t.Slug));
+        return Results.ValidationProblem(new Dictionary<string, string[]>
+        {
+            ["tagSlugs"] = [$"Unknown or unapproved tag(s): {string.Join(", ", invalid)}."],
+        });
+    }
+
     var visibility = Visibilities.IsValid(request.Visibility)
         ? request.Visibility!
         : Visibilities.Public;
@@ -377,6 +498,7 @@ registered.MapPut("/spots/{id:guid}/entry", async (
     var user = (await currentUser.GetAsync(ct))!;
 
     var entry = await db.SpotEntries
+        .Include(e => e.Tags)
         .FirstOrDefaultAsync(e => e.SpotId == id && e.UserId == user.Id, ct);
 
     var created = entry is null;
@@ -412,6 +534,7 @@ registered.MapPut("/spots/{id:guid}/entry", async (
     entry.TableSize = request.Ratings.TableSize;
     entry.Coffee = request.Ratings.Coffee;
     entry.GroupStudy = request.GroupStudy ?? false;
+    entry.Tags = tags;
     entry.CoffeeOrder = Trimmed(request.CoffeeOrder);
     entry.Notes = Trimmed(request.Notes);
     entry.Visibility = visibility;
@@ -494,6 +617,16 @@ static Dictionary<string, string[]> ValidateHandle(string? handle)
     return errors;
 }
 
+// Lowercase alphanumeric only, no separators - "Best for reading" becomes
+// "bestforreading". Hashtag-shaped on purpose, matching how slugs render as #slug in
+// the picker/filter chips: a hyphen would break that the way #best-for-reading reads
+// as broken on every platform that has hashtags.
+static string Slugify(string? name)
+{
+    var lowered = (name ?? "").ToLowerInvariant();
+    return new string(lowered.Where(c => c is (>= 'a' and <= 'z') or (>= '0' and <= '9')).ToArray());
+}
+
 static SpotEntryDto ToEntryDto(SpotEntry entry) => new(
     entry.Id,
     entry.SpotId,
@@ -501,6 +634,7 @@ static SpotEntryDto ToEntryDto(SpotEntry entry) => new(
         entry.Wifi, entry.Noise, entry.Outlets, entry.Seating, entry.TableSize, entry.Coffee),
     entry.Score,
     entry.GroupStudy,
+    entry.Tags.Select(t => t.Slug).ToList(),
     entry.CoffeeOrder,
     entry.Notes,
     entry.Visibility,
@@ -511,7 +645,15 @@ static async Task<SpotDetailDto> ToDetailDto(
     Spot spot, AppDbContext db, PlacesClient places, Guid userId, CancellationToken ct)
 {
     var myEntry = await db.SpotEntries
+        .Include(e => e.Tags)
         .FirstOrDefaultAsync(e => e.SpotId == spot.Id && e.UserId == userId, ct);
+
+    // The spot-wide aggregate — everyone's opinion, not just mine — parallel to
+    // AvgScore/EntryCount below.
+    var tagCounts = await db.SpotTagCounts
+        .Where(x => x.SpotId == spot.Id)
+        .Select(x => new SpotTagDto(x.Label!.Slug, x.EntryCount))
+        .ToListAsync(ct);
 
     // Hours are never stored (decision D8), so this is where they come from.
     var hours = spot.GooglePlaceId is null
@@ -525,7 +667,6 @@ static async Task<SpotDetailDto> ToDetailDto(
         spot.FormattedAddress,
         spot.Latitude,
         spot.Longitude,
-        spot.Type,
         spot.PriceLevel,
         spot.WebsiteUrl,
         spot.Phone,
@@ -534,6 +675,7 @@ static async Task<SpotDetailDto> ToDetailDto(
         HoursUnavailable: hours is null,
         spot.EntryCount,
         spot.AvgScore,
+        tagCounts,
         myEntry is null ? null : ToEntryDto(myEntry));
 }
 
@@ -580,6 +722,24 @@ static async Task RecomputeAggregates(AppDbContext db, Guid spotId, Cancellation
         spot.AvgCoffee = Math.Round(stats.Coffee, 1);
     }
 
+    await db.SaveChangesAsync(ct);
+
+    // Tag counts: same delete-and-re-derive philosophy as the averages above, just as
+    // rows instead of columns since tag cardinality is variable. Two separate
+    // SaveChanges calls (delete flushed before insert) rather than folding into one -
+    // a freshly re-added row would otherwise share a primary key with the row just
+    // marked for deletion on the same (spot_id, label_id).
+    var existingTagCounts = await db.SpotTagCounts.Where(x => x.SpotId == spotId).ToListAsync(ct);
+    db.SpotTagCounts.RemoveRange(existingTagCounts);
+    await db.SaveChangesAsync(ct);
+
+    var tagCounts = await visible
+        .SelectMany(e => e.Tags, (_, tag) => tag.Id)
+        .GroupBy(labelId => labelId)
+        .Select(g => new SpotTagCount { SpotId = spotId, LabelId = g.Key, EntryCount = g.Count() })
+        .ToListAsync(ct);
+
+    db.SpotTagCounts.AddRange(tagCounts);
     await db.SaveChangesAsync(ct);
 }
 

@@ -1,4 +1,3 @@
-import 'package:mobile/design/theme.dart';
 
 /// The six 1-5 ratings that make up a spot entry.
 ///
@@ -51,13 +50,18 @@ class MySpotListItem {
   final String entryId;
   final String name;
   final String? address;
-  final SpotType type;
   final double score;
   final Ratings ratings;
 
   /// My verdict on whether this place works for studying with other people. One user's
   /// opinion, not a fact about the place — the server stores it per entry.
   final bool groupStudy;
+
+  /// This entry's own tags (flat slugs, no `#`). Drives the client-side tag filter on
+  /// the Spots tab — this is one user's opinion, like [groupStudy], not the spot-wide
+  /// aggregate (that's [SpotDetail.tags]).
+  final List<String> tags;
+
   final int? priceLevel;
   final String? coffeeOrder;
   final String? notes;
@@ -68,10 +72,10 @@ class MySpotListItem {
     required this.entryId,
     required this.name,
     required this.address,
-    required this.type,
     required this.score,
     required this.ratings,
     required this.groupStudy,
+    required this.tags,
     required this.priceLevel,
     required this.coffeeOrder,
     required this.notes,
@@ -83,10 +87,10 @@ class MySpotListItem {
         entryId: json['entryId'] as String,
         name: json['name'] as String,
         address: json['address'] as String?,
-        type: spotTypeFromApi(json['type'] as String?),
         score: (json['score'] as num).toDouble(),
         ratings: Ratings.fromJson(json['ratings'] as Map<String, dynamic>),
         groupStudy: json['groupStudy'] as bool? ?? false,
+        tags: (json['tags'] as List<dynamic>?)?.cast<String>() ?? const [],
         priceLevel: (json['priceLevel'] as num?)?.toInt(),
         coffeeOrder: json['coffeeOrder'] as String?,
         notes: json['notes'] as String?,
@@ -101,6 +105,7 @@ class SpotEntry {
   final Ratings ratings;
   final double score;
   final bool groupStudy;
+  final List<String> tags;
   final String? coffeeOrder;
   final String? notes;
 
@@ -110,6 +115,7 @@ class SpotEntry {
     required this.ratings,
     required this.score,
     required this.groupStudy,
+    required this.tags,
     required this.coffeeOrder,
     required this.notes,
   });
@@ -120,8 +126,23 @@ class SpotEntry {
         ratings: Ratings.fromJson(json['ratings'] as Map<String, dynamic>),
         score: (json['score'] as num).toDouble(),
         groupStudy: json['groupStudy'] as bool? ?? false,
+        tags: (json['tags'] as List<dynamic>?)?.cast<String>() ?? const [],
         coffeeOrder: json['coffeeOrder'] as String?,
         notes: json['notes'] as String?,
+      );
+}
+
+/// A spot-wide aggregate: how many of a spot's entries carry [slug]. Everyone's
+/// opinion, not just mine — see [SpotDetail.tags] vs [MySpotListItem.tags].
+class SpotTag {
+  final String slug;
+  final int count;
+
+  const SpotTag({required this.slug, required this.count});
+
+  factory SpotTag.fromJson(Map<String, dynamic> json) => SpotTag(
+        slug: json['slug'] as String,
+        count: (json['count'] as num).toInt(),
       );
 }
 
@@ -135,7 +156,6 @@ class SpotDetail {
   final String? googlePlaceId;
   final String name;
   final String? address;
-  final SpotType type;
   final int? priceLevel;
   final String? websiteUrl;
   final String? phone;
@@ -144,6 +164,10 @@ class SpotDetail {
   final bool hoursUnavailable;
   final int entryCount;
   final double? avgScore;
+
+  /// The spot-wide aggregate — everyone's tags, not just mine. See [SpotTag].
+  final List<SpotTag> tags;
+
   final SpotEntry? myEntry;
 
   const SpotDetail({
@@ -151,7 +175,6 @@ class SpotDetail {
     required this.googlePlaceId,
     required this.name,
     required this.address,
-    required this.type,
     required this.priceLevel,
     required this.websiteUrl,
     required this.phone,
@@ -160,6 +183,7 @@ class SpotDetail {
     required this.hoursUnavailable,
     required this.entryCount,
     required this.avgScore,
+    required this.tags,
     required this.myEntry,
   });
 
@@ -168,7 +192,6 @@ class SpotDetail {
         googlePlaceId: json['googlePlaceId'] as String?,
         name: json['name'] as String,
         address: json['address'] as String?,
-        type: spotTypeFromApi(json['type'] as String?),
         priceLevel: (json['priceLevel'] as num?)?.toInt(),
         websiteUrl: json['websiteUrl'] as String?,
         phone: json['phone'] as String?,
@@ -177,6 +200,10 @@ class SpotDetail {
         hoursUnavailable: json['hoursUnavailable'] as bool? ?? true,
         entryCount: (json['entryCount'] as num?)?.toInt() ?? 0,
         avgScore: (json['avgScore'] as num?)?.toDouble(),
+        tags: (json['tags'] as List<dynamic>?)
+                ?.map((t) => SpotTag.fromJson(t as Map<String, dynamic>))
+                .toList() ??
+            const [],
         myEntry: json['myEntry'] == null
             ? null
             : SpotEntry.fromJson(json['myEntry'] as Map<String, dynamic>),

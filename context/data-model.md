@@ -13,10 +13,15 @@ erDiagram
     users ||--o{ follows : follower
     users ||--o{ follows : followee
     users ||--o{ activity_events : actor
+    users ||--o{ labels : requests
+    users ||--o{ labels : approves
     spots ||--o{ spot_entries : "is rated by"
     spots ||--o{ photos : has
+    spots ||--o{ spot_tag_counts : aggregates
     spot_entries ||--o{ photos : "attached to"
     spot_entries ||--o{ activity_events : announces
+    spot_entries }o--o{ labels : "tagged with"
+    labels ||--o{ spot_tag_counts : "counted in"
 
     users {
         uuid id PK
@@ -24,6 +29,7 @@ erDiagram
         text display_name
         text auth_subject UK
         bool is_private
+        bool is_admin
     }
     spots {
         uuid id PK
@@ -31,7 +37,6 @@ erDiagram
         text name
         float latitude
         float longitude
-        text type
         int price_level
         int entry_count "cached"
         numeric avg_score "cached"
@@ -51,6 +56,19 @@ erDiagram
         text coffee_order
         text notes
     }
+    labels {
+        uuid id PK
+        text slug UK
+        text display_name
+        text status
+        uuid requested_by FK
+        uuid approved_by FK
+    }
+    spot_tag_counts {
+        uuid spot_id PK,FK
+        uuid label_id PK,FK
+        int entry_count "cached"
+    }
     follows {
         uuid follower_id PK
         uuid followee_id PK
@@ -69,6 +87,10 @@ erDiagram
         timestamptz created_at
     }
 ```
+
+`spot_entry_tags` (the join table behind `spot_entries }o--o{ labels`) is omitted from
+the diagram, same convention as every other pure join in this file — no columns of
+its own beyond the two foreign keys.
 
 ## The central split
 
@@ -94,6 +116,9 @@ external identity provider and treats that pair as the login key.
 - `handle` is the public `@name`. Unique **case-insensitively** — enforced by a unique
   index on `lower(handle)`, not by the column type.
 - `is_private` gates whether follows need approval. See `follows.status`.
+- `is_admin` gates the label-moderation endpoints (`labels.status` below). The
+  schema's first permission field, deliberately minimal — one boolean, no roles
+  table. No self-serve way to become admin; promotion is a manual `UPDATE`.
 - `deleted_at` is a soft delete: a deleted user's spots survive (`spots.added_by` goes
   NULL), their entries cascade away.
 
@@ -110,13 +135,16 @@ One row per real-world place. **Globally shared** — not owned by whoever added
   records when. They're stored so lists render without an API call per row.
 - **No hours column** (D8). Hours are fetched live from Places when a single spot is
   rendered. See "Places data and caching" below.
-- `type` is `cafe | library | campus | other`, mapping to `SpotType` in
-  `lib/design/theme.dart`. Derived from the Places `types` array at creation, then
-  editable — Google's categories don't cleanly express "campus study room".
+- **No `type` column** (removed 2026-08-06, decision D10). Spots used to carry a
+  single required category (`cafe | library | campus | other`); that's gone,
+  replaced by the standardized, moderated tag/label system — see `### labels` below.
 - `entry_count`, `avg_score`, and `avg_wifi`…`avg_coffee` — which includes
   `avg_table_size` — are **cached aggregates**. They are derived data, recomputed when an
   entry is written. Never treat them as the source of truth; `spot_entries` is. There is
-  no cached column for `group_study`; see `spot_entries` below.
+  no cached column for `group_study`; see `spot_entries` below. Tag aggregation is a
+  separate table (`spot_tag_counts`), not inline columns here, because tag cardinality
+  is variable — unlike the six fixed rating categories, there's no fixed set of
+  `avg_*`-shaped columns to add.
 
 ### `spot_entries`
 
@@ -148,11 +176,54 @@ studying with other people? It is **one user's verdict, not a fact about the pla
 two people can disagree about the same spot, and that's the point. There is deliberately
 no group-study aggregate on `spots`.
 
+Each entry can also carry zero or more **tags**, through the `spot_entry_tags` join to
+`labels` — same shape as `group_study`, one user's opinion, not a fact set once on the
+spot. Unlike `group_study`, tags *do* aggregate: `spot_tag_counts` rolls up how many of
+a spot's entries carry each label, exactly the way `avg_wifi` etc. roll up the six
+ratings. Only `approved` labels may be attached — enforced by the API at write time,
+not a DB constraint (that would need a cross-table trigger). See `### labels` below.
+
 `coffee_order` and `notes` are optional free text (D6) — purely for your own recall,
 never validated, never parsed.
 
 `visibility` is `public | followers | private`, defaulting to `public`. Private entries
 are excluded from the feed and from a spot's aggregates.
+
+### `labels`
+
+The standardized, global tag vocabulary that replaced `spots.type` (decision D10,
+2026-08-06). Modeled on Beli's Labels: anyone can apply an existing label to their own
+entry; anyone can propose a new one, but it's unusable — by anyone, including whoever
+proposed it — until an admin reviews it.
+
+- `slug` is normalized: **lowercase alphanumeric only, no separators.** "Best for
+  reading" becomes `bestforreading`. This is deliberately not kebab-case — labels are
+  hashtag-shaped (`#cozy`, `#bestforreading`) everywhere they render, and a hyphen
+  breaks that the way `#best-for-reading` reads as broken on every platform that has
+  hashtags. Enforced by `CHECK (slug ~ '^[a-z0-9]{2,30}$')` and a unique index.
+- `display_name` is the human-readable form, stored separately since it can't be
+  losslessly reconstructed from `slug`. Mainly seen in the moderation queue.
+- `status` is `pending | approved | rejected`. Only `approved` labels appear in the
+  picker or validate on a `PUT .../entry` write. A request that dedupes to an existing
+  `pending` or `approved` label returns that row rather than creating a duplicate.
+- `requested_by` / `approved_by` are nullable FKs to `users`, `SET NULL` on delete —
+  provenance, not ownership. `approved_by` is set on rejection too ("who reviewed
+  this"), not only on approval.
+- **Known limitation**: the unique index on `slug` means a `rejected` slug is
+  permanently blocked from being re-requested. There's no "reconsider" endpoint — an
+  admin re-opens it by hand-editing the row if it ever matters.
+
+### `spot_tag_counts`
+
+A cached rollup: how many of a spot's (non-private) entries carry a given label.
+Composite primary key `(spot_id, label_id)`. Rebuilt from scratch — delete everything
+for the spot, re-derive — inside the same recompute pass as `spots.avg_*`, whenever an
+entry is written or deleted. `spot_entries` (via `spot_entry_tags`) is the source of
+truth; this is derived data, same rule as every other cached aggregate in this file.
+
+Doubles as the feature matrix a future recommender would want (spot × label weights) —
+not used for that yet, just a free byproduct of following the existing aggregate
+pattern rather than a live JOIN.
 
 ### `follows`
 
@@ -331,7 +402,9 @@ Client-side fallout — **done for Flutter, still outstanding for Angular**:
 - ~~`lib/models/studyspot.dart`~~ — replaced by `lib/models/spot.dart` with `Ratings`,
   `MySpotListItem`, `SpotEntry`, `SpotDetail` and `PlaceSuggestion`. `openUntil` is
   nullable, ids are `String`, and the local score calculation is gone.
-- ~~`main.dart` `SpotType` hardcoded to `cafe`~~ — now reads `spot.type` off the wire.
+- ~~`main.dart` `SpotType` hardcoded to `cafe`~~ — read `spot.type` off the wire for a
+  while, then `SpotType`/`type` were removed entirely (decision D10, 2026-08-06),
+  replaced by the label/tag system. See `### labels` above.
 - ~~`main.dart` `score` getter~~ — deleted; Postgres computes the score.
 - **`frontend/src/services/study-spot.service.ts` is now broken.** The Angular app still
   calls `/studyspots`, which no longer exists. Its `StudySpot` interface needs the same
