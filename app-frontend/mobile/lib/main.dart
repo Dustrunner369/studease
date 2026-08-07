@@ -13,6 +13,7 @@ import 'package:mobile/models/spot.dart';
 import 'package:mobile/design/illustrations.dart';
 import 'package:mobile/design/motion_widgets.dart';
 import 'package:mobile/design/theme.dart';
+import 'package:fuzzy/fuzzy.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -438,6 +439,17 @@ class _SpotsPageState extends State<SpotsPage> {
   }
 
   Widget _buildHeader(int? count) {
+    // Todo - add fuzzy search
+    //final _searchController = TextEditingController();
+    // final fuse = Fuzzy(
+    // bookList,
+    // options: FuzzyOptions(
+    //   findAllMatches: true,
+    //   tokenize: true,
+    //   threshold: 0.5,
+    //   ),
+    // );
+
     final countLabel = switch (count) {
       null => '',      
       1 => '1 spot',
