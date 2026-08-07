@@ -69,16 +69,27 @@ class _RevealOnceState extends State<RevealOnce> with SingleTickerProviderStateM
   late final AnimationController _controller;
   late final Animation<double> _opacity;
   late final Animation<Offset> _offset;
+  bool _started = false;
 
   @override
   void initState() {
     super.initState();
 
-    final reduceMotion = MediaQuery.of(context).disableAnimations;
     _controller = AnimationController(vsync: this, duration: Motion.long);
     _opacity = CurvedAnimation(parent: _controller, curve: Motion.easeOut);
     _offset = Tween<Offset>(begin: const Offset(0, 0.04), end: Offset.zero)
         .animate(_opacity);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_started) {
+      return;
+    }
+    _started = true;
+
+    final reduceMotion = MediaQuery.of(context).disableAnimations;
 
     // Stagger by position, capped at ~500ms total so a long list doesn't feel slow
     // to settle. Reduced motion: no delay, no rise, just the opacity fade.

@@ -193,6 +193,8 @@ class SpotsPage extends StatefulWidget {
   State<SpotsPage> createState() => _SpotsPageState();
 }
 
+final _searchBarController = TextEditingController(); 
+
 class _SpotsPageState extends State<SpotsPage> {
   // Multi-select, AND semantics: a spot must carry every selected tag to show.
   final Set<String> _filterTags = {};
@@ -207,6 +209,17 @@ class _SpotsPageState extends State<SpotsPage> {
   void initState() {
     super.initState();
     _load();
+    _searchBarController.addListener(_onSearchChanged);
+  }
+
+  @override
+  void dispose() {
+    _searchBarController.removeListener(_onSearchChanged);
+    super.dispose();
+  }
+
+  void _onSearchChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _load() async {
@@ -319,14 +332,45 @@ class _SpotsPageState extends State<SpotsPage> {
     );
   }
 
+  List<MySpotListItem> get _getVisibleSpots {    
+    // Check if spots is null    
+    List<MySpotListItem>? spotsToReturn = _spots;
+    if(spotsToReturn == null){
+      return [];
+    }
+    // Filter by tag first
+    spotsToReturn = _filterTags.isEmpty
+      ? spotsToReturn
+      : spotsToReturn.where((s) => _filterTags.every(s.tags.contains)).toList();
+
+    // Then perform fuzzy search
+    final query = _searchBarController.text.trim();
+    if (query.isEmpty){
+      return spotsToReturn;
+    } 
+    
+    final fuzzy = Fuzzy(
+      spotsToReturn,
+      options: FuzzyOptions(
+        keys: [
+          WeightedKey<MySpotListItem>(name: 'name', getter: (s) => s.name, weight: 2),
+          WeightedKey<MySpotListItem>(name: 'address', getter: (s) => s.address ?? '', weight: 1),
+          WeightedKey<MySpotListItem>(name: 'tags', getter: (s) => s.tags.join(' '), weight: 1)
+        ],
+        findAllMatches: true,
+        tokenize: true,
+        threshold: 0.3,
+      ),
+    );
+
+    // Return as a list of Spot items
+    return fuzzy.search(query).map((r) => r.item).toList();
+  }
+
   @override
   Widget build(BuildContext context) {
     final spots = _spots;
-    final visible = spots == null
-        ? const <MySpotListItem>[]
-        : (_filterTags.isEmpty
-            ? spots
-            : spots.where((s) => _filterTags.every(s.tags.contains)).toList());
+    final visible = _getVisibleSpots;
 
     return Scaffold(
       body: SafeArea(
@@ -437,19 +481,8 @@ class _SpotsPageState extends State<SpotsPage> {
       ],
     ];
   }
-
-  Widget _buildHeader(int? count) {
-    // Todo - add fuzzy search
-    //final _searchController = TextEditingController();
-    // final fuse = Fuzzy(
-    // bookList,
-    // options: FuzzyOptions(
-    //   findAllMatches: true,
-    //   tokenize: true,
-    //   threshold: 0.5,
-    //   ),
-    // );
-
+  
+  Widget _buildHeader(int? count) {    
     final countLabel = switch (count) {
       null => '',      
       1 => '1 spot',
@@ -504,26 +537,37 @@ class _SpotsPageState extends State<SpotsPage> {
     );
   }
 
-  Widget _buildSearchBar() {
-    return InkWell(
-      onTap: () => _soon('Search — coming soon'),
+  Widget _buildSearchBar() {    
+    return InkWell(      
       borderRadius: BorderRadius.circular(12),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 14),
         decoration: BoxDecoration(
           color: Tone.field,
           borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
           children: [
-            const Icon(Icons.search, size: 20, color: Tone.muted),
+            const Icon(Icons.search, size: 20, color: Tone.muted),            
             const SizedBox(width: 8),
-            Text(
-              'Search your spots',
-              style: GoogleFonts.fraunces(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: Tone.muted,
+            Expanded(
+              child: TextField(
+                controller: _searchBarController,
+                autofocus: false,
+                decoration: InputDecoration(
+                  border: InputBorder.none,
+                  hintText: 'Search your spots',
+                  hintStyle: GoogleFonts.fraunces(
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w500,
+                    color: Tone.muted,
+                  ),
+                ),                            
+                style: GoogleFonts.fraunces(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: Tone.muted,
+                ),
               ),
             ),
           ],
@@ -531,7 +575,6 @@ class _SpotsPageState extends State<SpotsPage> {
       ),
     );
   }
-
   // Options come from whatever tags are actually present on the loaded spots, not
   // the full global label list — a chip that would always show zero results isn't
   // worth offering.
@@ -706,8 +749,7 @@ class SpotRow extends StatelessWidget {
                   color: Tone.muted,
                 ),
               ),
-            ),
-            const _CategoryCircle(),
+            ),            
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -770,24 +812,6 @@ class SpotRow extends StatelessWidget {
   }
 }
 
-// Every row gets the same neutral glyph now — spots no longer have a single category
-// to color-code by, since a spot's tags are optional and multi-valued (see the
-// label/tag system replacing SpotType). A visible step down from the old per-category
-// icon+color, accepted as the mechanical trade for this pass; tags render as pills
-// below the name instead, not a leading glyph.
-class _CategoryCircle extends StatelessWidget {
-  const _CategoryCircle();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 44,
-      height: 44,
-      decoration: const BoxDecoration(color: Tone.field, shape: BoxShape.circle),
-      child: const Icon(Icons.place, size: 20, color: Tone.muted),
-    );
-  }
-}
 
 /// A non-interactive `#slug` pill row — the row/detail-sheet display counterpart to
 /// the tappable filter chips in `_buildFilters` and the tappable picker chips in
@@ -917,8 +941,7 @@ class SpotDetailSheet extends StatelessWidget {
                 ),
                 const SizedBox(height: 20),
                 Row(
-                  children: [
-                    const _CategoryCircle(),
+                  children: [                    
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(

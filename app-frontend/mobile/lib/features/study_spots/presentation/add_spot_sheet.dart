@@ -41,8 +41,7 @@ class _AddSpotSheetState extends State<AddSpotSheet> {
   Timer? _debounce;
   bool _searching = false;
 
-  // Set when the server has no Places key, or when the spot isn't on Google at all
-  // — a campus study room usually isn't.
+  // Set to true when user wants to manually enter a study spot
   bool _manualEntry = false;
   String? _searchNotice;
 
