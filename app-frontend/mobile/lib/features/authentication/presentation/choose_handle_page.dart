@@ -80,7 +80,7 @@ class _ChooseHandlePageState extends State<ChooseHandlePage> {
               children: [
                 Text(
                   'Pick a handle',
-                  style: GoogleFonts.plusJakartaSans(
+                  style: GoogleFonts.fraunces(
                     fontSize: 26,
                     fontWeight: FontWeight.w800,
                     color: Tone.ink,
@@ -89,7 +89,7 @@ class _ChooseHandlePageState extends State<ChooseHandlePage> {
                 const SizedBox(height: 6),
                 Text(
                   "This is how people find you. Choose carefully — it's not easy to change later.",
-                  style: GoogleFonts.plusJakartaSans(
+                  style: GoogleFonts.fraunces(
                     fontSize: 13.5,
                     fontWeight: FontWeight.w500,
                     color: Tone.muted,
@@ -105,7 +105,7 @@ class _ChooseHandlePageState extends State<ChooseHandlePage> {
                     children: [
                       Text(
                         '@',
-                        style: GoogleFonts.plusJakartaSans(
+                        style: GoogleFonts.fraunces(
                           fontSize: 14.5,
                           fontWeight: FontWeight.w700,
                           color: Tone.muted,
@@ -117,7 +117,7 @@ class _ChooseHandlePageState extends State<ChooseHandlePage> {
                           maxLength: 30,
                           inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[a-z0-9_]'))],
                           decoration: const InputDecoration(border: InputBorder.none, counterText: ''),
-                          style: GoogleFonts.plusJakartaSans(
+                          style: GoogleFonts.fraunces(
                             fontSize: 14.5,
                             fontWeight: FontWeight.w600,
                             color: Tone.ink,
@@ -138,13 +138,13 @@ class _ChooseHandlePageState extends State<ChooseHandlePage> {
                     decoration: InputDecoration(
                       border: InputBorder.none,
                       hintText: 'Jamie Rivera',
-                      hintStyle: GoogleFonts.plusJakartaSans(
+                      hintStyle: GoogleFonts.fraunces(
                         fontSize: 14.5,
                         fontWeight: FontWeight.w500,
                         color: Tone.muted,
                       ),
                     ),
-                    style: GoogleFonts.plusJakartaSans(
+                    style: GoogleFonts.fraunces(
                       fontSize: 14.5,
                       fontWeight: FontWeight.w600,
                       color: Tone.ink,
@@ -156,21 +156,21 @@ class _ChooseHandlePageState extends State<ChooseHandlePage> {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Tone.coral.withValues(alpha: 0.1),
+                      color: Tone.error.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Icon(Icons.error_outline, size: 18, color: Tone.coral),
+                        const Icon(Icons.error_outline, size: 18, color: Tone.error),
                         const SizedBox(width: 10),
                         Expanded(
                           child: Text(
                             _error!,
-                            style: GoogleFonts.plusJakartaSans(
+                            style: GoogleFonts.fraunces(
                               fontSize: 13,
                               fontWeight: FontWeight.w600,
-                              color: Tone.coral,
+                              color: Tone.error,
                             ),
                           ),
                         ),
@@ -195,7 +195,7 @@ class _ChooseHandlePageState extends State<ChooseHandlePage> {
                               )
                             : Text(
                                 'Done',
-                                style: GoogleFonts.plusJakartaSans(
+                                style: GoogleFonts.fraunces(
                                   fontSize: 15,
                                   fontWeight: FontWeight.w700,
                                   color: Colors.white,
@@ -215,7 +215,7 @@ class _ChooseHandlePageState extends State<ChooseHandlePage> {
 
   Widget _label(String text) => Text(
         text,
-        style: GoogleFonts.plusJakartaSans(
+        style: GoogleFonts.fraunces(
           fontSize: 11.5,
           fontWeight: FontWeight.w700,
           letterSpacing: 1.2,

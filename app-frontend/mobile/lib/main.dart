@@ -10,6 +10,8 @@ import 'package:mobile/features/study_spots/presentation/add_spot_sheet.dart';
 import 'package:mobile/services/auth_controller.dart';
 import 'package:mobile/services/api_service.dart';
 import 'package:mobile/models/spot.dart';
+import 'package:mobile/design/illustrations.dart';
+import 'package:mobile/design/motion_widgets.dart';
 import 'package:mobile/design/theme.dart';
 
 Future<void> main() async {
@@ -37,8 +39,8 @@ class StudySpotApp extends StatelessWidget {
       theme: ThemeData(
         useMaterial3: true,
         scaffoldBackgroundColor: Tone.bg,
-        colorScheme: ColorScheme.fromSeed(seedColor: Tone.teal),
-        textTheme: GoogleFonts.plusJakartaSansTextTheme(),
+        colorScheme: ColorScheme.fromSeed(seedColor: Tone.terracotta),
+        textTheme: GoogleFonts.frauncesTextTheme(),
         splashColor: Tone.field,
         highlightColor: Tone.field,
       ),
@@ -61,13 +63,23 @@ class _BootSplash extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
+    return Scaffold(
       backgroundColor: Tone.bg,
       body: Center(
-        child: SizedBox(
-          width: 26,
-          height: 26,
-          child: CircularProgressIndicator(strokeWidth: 2.5, color: Tone.ink),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // The one wordmark moment in the app right now — outlier typeface,
+            // used nowhere else. Placeholder script until a purchased font
+            // replaces it; see AppText.wordmark.
+            Text('Studease', style: AppText.wordmark()),
+            const SizedBox(height: Space.lg),
+            const SizedBox(
+              width: 26,
+              height: 26,
+              child: CircularProgressIndicator(strokeWidth: 2.5, color: Tone.ink),
+            ),
+          ],
         ),
       ),
     );
@@ -100,7 +112,7 @@ class _BootError extends StatelessWidget {
               const SizedBox(height: 12),
               Text(
                 _isAuthFailure ? "Couldn't sign you in" : "Couldn't reach the server",
-                style: GoogleFonts.plusJakartaSans(fontSize: 15, fontWeight: FontWeight.w700, color: Tone.ink),
+                style: GoogleFonts.fraunces(fontSize: 15, fontWeight: FontWeight.w700, color: Tone.ink),
               ),
               const SizedBox(height: 4),
               Text(
@@ -108,7 +120,7 @@ class _BootError extends StatelessWidget {
                 textAlign: TextAlign.center,
                 maxLines: 3,
                 overflow: TextOverflow.ellipsis,
-                style: GoogleFonts.plusJakartaSans(fontSize: 12.5, fontWeight: FontWeight.w500, color: Tone.muted),
+                style: GoogleFonts.fraunces(fontSize: 12.5, fontWeight: FontWeight.w500, color: Tone.muted),
               ),
               const SizedBox(height: 16),
               InkWell(
@@ -119,7 +131,7 @@ class _BootError extends StatelessWidget {
                   decoration: BoxDecoration(color: Tone.ink, borderRadius: BorderRadius.circular(20)),
                   child: Text(
                     'Retry',
-                    style: GoogleFonts.plusJakartaSans(fontSize: 13.5, fontWeight: FontWeight.w700, color: Colors.white),
+                    style: GoogleFonts.fraunces(fontSize: 13.5, fontWeight: FontWeight.w700, color: Colors.white),
                   ),
                 ),
               ),
@@ -255,14 +267,14 @@ class _SpotsPageState extends State<SpotsPage> {
         duration: const Duration(seconds: 5),
         content: Text(
           'Removed ${spot.name}',
-          style: GoogleFonts.plusJakartaSans(
+          style: GoogleFonts.fraunces(
             color: Colors.white,
             fontWeight: FontWeight.w600,
           ),
         ),
         action: SnackBarAction(
           label: 'Undo',
-          textColor: Tone.amber,
+          textColor: Tone.terracotta,
           onPressed: () => _restore(spot),
         ),
       ),
@@ -297,7 +309,7 @@ class _SpotsPageState extends State<SpotsPage> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         content: Text(
           message,
-          style: GoogleFonts.plusJakartaSans(
+          style: GoogleFonts.fraunces(
             color: Colors.white,
             fontWeight: FontWeight.w600,
           ),
@@ -344,11 +356,14 @@ class _SpotsPageState extends State<SpotsPage> {
           ),
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _addSpot,
-        backgroundColor: Tone.ink,
-        shape: const CircleBorder(),
-        child: const Icon(Icons.add, color: Colors.white),
+      floatingActionButton: PressScale(
+        onTap: _addSpot,
+        child: Container(
+          width: 56,
+          height: 56,
+          decoration: const BoxDecoration(color: Tone.terracotta, shape: BoxShape.circle),
+          child: const Icon(Icons.add, color: Colors.white),
+        ),
       ),
       bottomNavigationBar: CleanBottomNav(currentIndex: 0, auth: widget.auth),
     );
@@ -380,17 +395,19 @@ class _SpotsPageState extends State<SpotsPage> {
     if (visible.isEmpty) {
       return [
         Padding(
-          padding: const EdgeInsets.symmetric(vertical: 80),
+          padding: const EdgeInsets.symmetric(vertical: Space.xl2),
           child: Center(
-            child: Text(
-              _filterTags.isEmpty
-                  ? 'No spots yet — tap + to add one'
-                  : 'No spots tagged ${_filterTags.map((t) => '#$t').join(', ')}',
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: Tone.muted,
-              ),
+            child: Column(
+              children: [
+                const MokaPotSketch(size: 96, color: Tone.muted),
+                const SizedBox(height: Space.md),
+                Text(
+                  _filterTags.isEmpty
+                      ? 'No spots yet — tap + to add one'
+                      : 'No spots tagged ${_filterTags.map((t) => '#$t').join(', ')}',
+                  style: AppText.body(color: Tone.muted, weight: FontWeight.w600),
+                ),
+              ],
             ),
           ),
         ),
@@ -400,12 +417,17 @@ class _SpotsPageState extends State<SpotsPage> {
     return [
       for (var i = 0; i < visible.length; i++) ...[
         // Keyed by entry so dismissing one row doesn't take its neighbour's state
-        // with it when the list closes up.
-        _DismissibleSpotRow(
-          key: ValueKey(visible[i].entryId),
-          rank: i + 1,
-          spot: visible[i],
-          onDismissed: () => _deleteSpot(visible[i]),
+        // with it when the list closes up, and so RevealOnce only animates a row
+        // that's genuinely new — not every row on a pull-to-refresh.
+        RevealOnce(
+          key: ValueKey('reveal-${visible[i].entryId}'),
+          index: i,
+          child: _DismissibleSpotRow(
+            key: ValueKey(visible[i].entryId),
+            rank: i + 1,
+            spot: visible[i],
+            onDismissed: () => _deleteSpot(visible[i]),
+          ),
         ),
         const Padding(
           padding: EdgeInsets.only(left: 20),
@@ -417,9 +439,9 @@ class _SpotsPageState extends State<SpotsPage> {
 
   Widget _buildHeader(int? count) {
     final countLabel = switch (count) {
-      null => 'Point Loma',
-      1 => '1 spot · Point Loma',
-      _ => '$count spots · Point Loma',
+      null => '',      
+      1 => '1 spot',
+      _ => '$count spots',
     };
 
     return Row(
@@ -431,7 +453,7 @@ class _SpotsPageState extends State<SpotsPage> {
             children: [
               Text(
                 'Spots',
-                style: GoogleFonts.plusJakartaSans(
+                style: GoogleFonts.fraunces(
                   fontSize: 30,
                   fontWeight: FontWeight.w800,
                   letterSpacing: -0.5,
@@ -442,7 +464,7 @@ class _SpotsPageState extends State<SpotsPage> {
               // small tri-color accent line
               Row(
                 children: [
-                  for (final c in const [Tone.teal, Tone.amber, Tone.coral])
+                  for (final c in const [Tone.terracotta, Tone.slate, Tone.sage])
                     Container(
                       width: 16,
                       height: 3,
@@ -457,7 +479,7 @@ class _SpotsPageState extends State<SpotsPage> {
               const SizedBox(height: 10),
               Text(
                 countLabel,
-                style: GoogleFonts.plusJakartaSans(
+                style: GoogleFonts.fraunces(
                   fontSize: 13,
                   fontWeight: FontWeight.w500,
                   color: Tone.muted,
@@ -486,7 +508,7 @@ class _SpotsPageState extends State<SpotsPage> {
             const SizedBox(width: 8),
             Text(
               'Search your spots',
-              style: GoogleFonts.plusJakartaSans(
+              style: GoogleFonts.fraunces(
                 fontSize: 14,
                 fontWeight: FontWeight.w500,
                 color: Tone.muted,
@@ -527,7 +549,7 @@ class _SpotsPageState extends State<SpotsPage> {
                 ),
                 child: Text(
                   '#$tag',
-                  style: GoogleFonts.plusJakartaSans(
+                  style: GoogleFonts.fraunces(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
                     color: _filterTags.contains(tag) ? Colors.white : Tone.ink,
@@ -563,7 +585,7 @@ class _ErrorBox extends StatelessWidget {
           const SizedBox(height: 12),
           Text(
             "Couldn't load spots",
-            style: GoogleFonts.plusJakartaSans(
+            style: GoogleFonts.fraunces(
               fontSize: 15,
               fontWeight: FontWeight.w700,
               color: Tone.ink,
@@ -575,7 +597,7 @@ class _ErrorBox extends StatelessWidget {
             textAlign: TextAlign.center,
             maxLines: 3,
             overflow: TextOverflow.ellipsis,
-            style: GoogleFonts.plusJakartaSans(
+            style: GoogleFonts.fraunces(
               fontSize: 12.5,
               fontWeight: FontWeight.w500,
               color: Tone.muted,
@@ -594,7 +616,7 @@ class _ErrorBox extends StatelessWidget {
               ),
               child: Text(
                 'Retry',
-                style: GoogleFonts.plusJakartaSans(
+                style: GoogleFonts.fraunces(
                   fontSize: 13.5,
                   fontWeight: FontWeight.w700,
                   color: Colors.white,
@@ -633,7 +655,7 @@ class _DismissibleSpotRow extends StatelessWidget {
       direction: DismissDirection.endToStart,
       onDismissed: (_) => onDismissed(),
       background: Container(
-        color: Tone.coral,
+        color: Tone.error,
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 24),
         child: const Icon(Icons.delete_outline, color: Colors.white),
@@ -651,7 +673,7 @@ class SpotRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
+    return PressScale(
       onTap: () => showModalBottomSheet(
         context: context,
         backgroundColor: Colors.transparent,
@@ -666,7 +688,7 @@ class SpotRow extends StatelessWidget {
               width: 22,
               child: Text(
                 '$rank',
-                style: GoogleFonts.plusJakartaSans(
+                style: GoogleFonts.fraunces(
                   fontSize: 15,
                   fontWeight: FontWeight.w700,
                   color: Tone.muted,
@@ -683,7 +705,7 @@ class SpotRow extends StatelessWidget {
                     spot.name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.plusJakartaSans(
+                    style: GoogleFonts.fraunces(
                       fontSize: 15.5,
                       fontWeight: FontWeight.w700,
                       color: Tone.ink,
@@ -694,7 +716,7 @@ class SpotRow extends StatelessWidget {
                     spot.subtitle,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.plusJakartaSans(
+                    style: GoogleFonts.fraunces(
                       fontSize: 12.5,
                       fontWeight: FontWeight.w500,
                       color: Tone.muted,
@@ -716,7 +738,7 @@ class SpotRow extends StatelessWidget {
                       if (spot.groupStudy)
                         const Tooltip(
                           message: 'Good for group study',
-                          child: Icon(Icons.groups, size: 14, color: Tone.teal),
+                          child: Icon(Icons.groups, size: 14, color: Tone.sage),
                         ),
                     ],
                   ),
@@ -728,7 +750,7 @@ class SpotRow extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 8),
-            _ScoreBubble(score: spot.score),
+            _ScoreBubble(score: spot.score, heroTag: 'score-${spot.entryId}'),
           ],
         ),
       ),
@@ -778,7 +800,7 @@ class _TagPills extends StatelessWidget {
             ),
             child: Text(
               '#$tag',
-              style: GoogleFonts.plusJakartaSans(
+              style: GoogleFonts.fraunces(
                 fontSize: 11.5,
                 fontWeight: FontWeight.w700,
                 color: Tone.ink,
@@ -793,11 +815,21 @@ class _TagPills extends StatelessWidget {
 class _ScoreBubble extends StatelessWidget {
   final double score;
 
-  const _ScoreBubble({required this.score});
+  /// When set, this bubble is a Hero endpoint — pass the same tag on the row and
+  /// the detail sheet (`'score-$entryId'`) and Flutter flies the bubble between
+  /// them on navigation instead of the sheet just appearing. Null renders a plain
+  /// bubble with no flight (used nowhere twice at once, so no tag collision risk).
+  final String? heroTag;
+
+  const _ScoreBubble({required this.score, this.heroTag});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    // AnimatedContainer, not Container: if a spot's score changes (re-rated),
+    // the fill color crossfades instead of snapping.
+    final bubble = AnimatedContainer(
+      duration: Motion.short,
+      curve: Motion.easeInOut,
       width: 42,
       height: 42,
       alignment: Alignment.center,
@@ -807,13 +839,11 @@ class _ScoreBubble extends StatelessWidget {
       ),
       child: Text(
         score.toStringAsFixed(1),
-        style: GoogleFonts.plusJakartaSans(
-          fontSize: 13.5,
-          fontWeight: FontWeight.w800,
-          color: Colors.white,
-        ),
+        style: AppText.bodySm(color: Colors.white, weight: FontWeight.w800),
       ),
     );
+
+    return heroTag == null ? bubble : Hero(tag: heroTag!, child: bubble);
   }
 }
 
@@ -835,7 +865,7 @@ class SpotDetailSheet extends StatelessWidget {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         content: Text(
           message,
-          style: GoogleFonts.plusJakartaSans(
+          style: GoogleFonts.fraunces(
             color: Colors.white,
             fontWeight: FontWeight.w600,
           ),
@@ -884,7 +914,7 @@ class SpotDetailSheet extends StatelessWidget {
                         children: [
                           Text(
                             spot.name,
-                            style: GoogleFonts.plusJakartaSans(
+                            style: GoogleFonts.fraunces(
                               fontSize: 19,
                               fontWeight: FontWeight.w800,
                               color: Tone.ink,
@@ -897,7 +927,7 @@ class SpotDetailSheet extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 10),
-                    _ScoreBubble(score: spot.score),
+                    _ScoreBubble(score: spot.score, heroTag: 'score-${spot.entryId}'),
                   ],
                 ),
                 const SizedBox(height: 20),
@@ -905,7 +935,7 @@ class SpotDetailSheet extends StatelessWidget {
                 const SizedBox(height: 16),
                 Text(
                   'THE RUNDOWN',
-                  style: GoogleFonts.plusJakartaSans(
+                  style: GoogleFonts.fraunces(
                     fontSize: 11.5,
                     fontWeight: FontWeight.w700,
                     letterSpacing: 1.2,
@@ -923,7 +953,7 @@ class SpotDetailSheet extends StatelessWidget {
                         Expanded(
                           child: Text(
                             label,
-                            style: GoogleFonts.plusJakartaSans(
+                            style: GoogleFonts.fraunces(
                               fontSize: 14.5,
                               fontWeight: FontWeight.w600,
                               color: Tone.ink,
@@ -941,7 +971,7 @@ class SpotDetailSheet extends StatelessWidget {
                         ),
                         Text(
                           level.display,
-                          style: GoogleFonts.plusJakartaSans(
+                          style: GoogleFonts.fraunces(
                             fontSize: 13.5,
                             fontWeight: FontWeight.w700,
                             color: level.color,
@@ -961,7 +991,7 @@ class SpotDetailSheet extends StatelessWidget {
                       Expanded(
                         child: Text(
                           'Group study',
-                          style: GoogleFonts.plusJakartaSans(
+                          style: GoogleFonts.fraunces(
                             fontSize: 14.5,
                             fontWeight: FontWeight.w600,
                             color: Tone.ink,
@@ -970,10 +1000,10 @@ class SpotDetailSheet extends StatelessWidget {
                       ),
                       Text(
                         spot.groupStudy ? 'Works' : 'Not really',
-                        style: GoogleFonts.plusJakartaSans(
+                        style: GoogleFonts.fraunces(
                           fontSize: 13.5,
                           fontWeight: FontWeight.w700,
-                          color: spot.groupStudy ? Tone.teal : Tone.muted,
+                          color: spot.groupStudy ? Tone.sage : Tone.muted,
                         ),
                       ),
                     ],
@@ -983,7 +1013,7 @@ class SpotDetailSheet extends StatelessWidget {
                   const SizedBox(height: 10),
                   Text(
                     'TAGS',
-                    style: GoogleFonts.plusJakartaSans(
+                    style: GoogleFonts.fraunces(
                       fontSize: 11.5,
                       fontWeight: FontWeight.w700,
                       letterSpacing: 1.2,
@@ -999,7 +1029,7 @@ class SpotDetailSheet extends StatelessWidget {
                   const SizedBox(height: 10),
                   Text(
                     'DETAILS',
-                    style: GoogleFonts.plusJakartaSans(
+                    style: GoogleFonts.fraunces(
                       fontSize: 11.5,
                       fontWeight: FontWeight.w700,
                       letterSpacing: 1.2,
@@ -1021,7 +1051,7 @@ class SpotDetailSheet extends StatelessWidget {
                               children: [
                                 Text(
                                   label,
-                                  style: GoogleFonts.plusJakartaSans(
+                                  style: GoogleFonts.fraunces(
                                     fontSize: 12,
                                     fontWeight: FontWeight.w600,
                                     color: Tone.muted,
@@ -1030,7 +1060,7 @@ class SpotDetailSheet extends StatelessWidget {
                                 const SizedBox(height: 2),
                                 Text(
                                   value,
-                                  style: GoogleFonts.plusJakartaSans(
+                                  style: GoogleFonts.fraunces(
                                     fontSize: 14.5,
                                     fontWeight: FontWeight.w600,
                                     color: Tone.ink,
@@ -1115,7 +1145,7 @@ class _HoursLineState extends State<_HoursLine> {
 
     return Text(
       'Until $_openUntil',
-      style: GoogleFonts.plusJakartaSans(
+      style: GoogleFonts.fraunces(
         fontSize: 12.5,
         fontWeight: FontWeight.w500,
         color: Tone.muted,
@@ -1158,7 +1188,7 @@ class _SheetButton extends StatelessWidget {
             const SizedBox(width: 6),
             Text(
               label,
-              style: GoogleFonts.plusJakartaSans(
+              style: GoogleFonts.fraunces(
                 fontSize: 14,
                 fontWeight: FontWeight.w700,
                 color: fg,
@@ -1267,7 +1297,7 @@ class _NavItem extends StatelessWidget {
             const SizedBox(height: 2),
             Text(
               label,
-              style: GoogleFonts.plusJakartaSans(
+              style: GoogleFonts.fraunces(
                 fontSize: 11,
                 fontWeight: active ? FontWeight.w700 : FontWeight.w500,
                 color: color,
@@ -1292,7 +1322,7 @@ class _MapComingSoonPage extends StatelessWidget {
         child: Center(
           child: Text(
             'Map — coming soon',
-            style: GoogleFonts.plusJakartaSans(fontSize: 14, fontWeight: FontWeight.w600, color: Tone.muted),
+            style: GoogleFonts.fraunces(fontSize: 14, fontWeight: FontWeight.w600, color: Tone.muted),
           ),
         ),
       ),

@@ -31,7 +31,7 @@ class ProfilePage extends StatelessWidget {
                 children: [
                   Text(
                     'Profile',
-                    style: GoogleFonts.plusJakartaSans(
+                    style: GoogleFonts.fraunces(
                       fontSize: 30,
                       fontWeight: FontWeight.w800,
                       letterSpacing: -0.5,
@@ -69,18 +69,18 @@ class _GuestPrompt extends StatelessWidget {
           const SizedBox(height: 14),
           Text(
             "You don't have an account yet!",
-            style: GoogleFonts.plusJakartaSans(fontSize: 17, fontWeight: FontWeight.w800, color: Tone.ink),
+            style: GoogleFonts.fraunces(fontSize: 17, fontWeight: FontWeight.w800, color: Tone.ink),
           ),
           const SizedBox(height: 6),
           Text(
             "You're browsing as a guest — your spots stay right here on this device. "
             'Create an account to keep them for good, on any device.',
-            style: GoogleFonts.plusJakartaSans(fontSize: 13.5, fontWeight: FontWeight.w500, color: Tone.muted),
+            style: GoogleFonts.fraunces(fontSize: 13.5, fontWeight: FontWeight.w500, color: Tone.muted),
           ),
           const SizedBox(height: 6),
           Text(
             '${me.entryCount} of $guestEntryLimit guest spots used',
-            style: GoogleFonts.plusJakartaSans(fontSize: 12.5, fontWeight: FontWeight.w600, color: Tone.teal),
+            style: GoogleFonts.fraunces(fontSize: 12.5, fontWeight: FontWeight.w600, color: Tone.terracotta),
           ),
           const SizedBox(height: 16),
           SizedBox(
@@ -95,7 +95,7 @@ class _GuestPrompt extends StatelessWidget {
                 child: Center(
                   child: Text(
                     'Create one?',
-                    style: GoogleFonts.plusJakartaSans(fontSize: 14.5, fontWeight: FontWeight.w700, color: Colors.white),
+                    style: GoogleFonts.fraunces(fontSize: 14.5, fontWeight: FontWeight.w700, color: Colors.white),
                   ),
                 ),
               ),
@@ -109,7 +109,7 @@ class _GuestPrompt extends StatelessWidget {
               )),
               child: Text(
                 'Already have an account? Sign in',
-                style: GoogleFonts.plusJakartaSans(fontSize: 12.5, fontWeight: FontWeight.w700, color: Tone.teal),
+                style: GoogleFonts.fraunces(fontSize: 12.5, fontWeight: FontWeight.w700, color: Tone.terracotta),
               ),
             ),
           ),
@@ -146,7 +146,7 @@ class _AccountCard extends StatelessWidget {
               backgroundColor: Tone.field,
               child: Text(
                 me.displayName.isNotEmpty ? me.displayName[0].toUpperCase() : '?',
-                style: GoogleFonts.plusJakartaSans(fontSize: 20, fontWeight: FontWeight.w800, color: Tone.ink),
+                style: GoogleFonts.fraunces(fontSize: 20, fontWeight: FontWeight.w800, color: Tone.ink),
               ),
             ),
             const SizedBox(width: 14),
@@ -156,11 +156,11 @@ class _AccountCard extends StatelessWidget {
                 children: [
                   Text(
                     me.displayName,
-                    style: GoogleFonts.plusJakartaSans(fontSize: 17, fontWeight: FontWeight.w800, color: Tone.ink),
+                    style: GoogleFonts.fraunces(fontSize: 17, fontWeight: FontWeight.w800, color: Tone.ink),
                   ),
                   Text(
                     '@${me.handle}',
-                    style: GoogleFonts.plusJakartaSans(fontSize: 13, fontWeight: FontWeight.w600, color: Tone.muted),
+                    style: GoogleFonts.fraunces(fontSize: 13, fontWeight: FontWeight.w600, color: Tone.muted),
                   ),
                 ],
               ),
@@ -177,7 +177,7 @@ class _AccountCard extends StatelessWidget {
               const SizedBox(width: 10),
               Text(
                 '${me.entryCount} spot${me.entryCount == 1 ? '' : 's'} rated',
-                style: GoogleFonts.plusJakartaSans(fontSize: 13.5, fontWeight: FontWeight.w600, color: Tone.ink),
+                style: GoogleFonts.fraunces(fontSize: 13.5, fontWeight: FontWeight.w600, color: Tone.ink),
               ),
             ],
           ),
@@ -197,7 +197,7 @@ class _AccountCard extends StatelessWidget {
               child: Center(
                 child: Text(
                   'Sign out',
-                  style: GoogleFonts.plusJakartaSans(fontSize: 14.5, fontWeight: FontWeight.w700, color: Tone.coral),
+                  style: GoogleFonts.fraunces(fontSize: 14.5, fontWeight: FontWeight.w700, color: Tone.error),
                 ),
               ),
             ),

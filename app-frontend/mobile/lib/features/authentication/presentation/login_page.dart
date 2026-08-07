@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:mobile/design/illustrations.dart';
 import 'package:mobile/design/theme.dart';
 import 'package:mobile/features/authentication/presentation/choose_handle_page.dart';
 import 'package:mobile/services/auth_controller.dart';
@@ -131,9 +132,11 @@ class _LoginPageState extends State<LoginPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              const Center(child: CoffeeCupSketch(size: 84)),
+              const SizedBox(height: 12),
               Text(
                 _isSignUp ? 'Create your account' : 'Welcome back',
-                style: GoogleFonts.plusJakartaSans(
+                style: GoogleFonts.fraunces(
                   fontSize: 26,
                   fontWeight: FontWeight.w800,
                   color: Tone.ink,
@@ -144,7 +147,7 @@ class _LoginPageState extends State<LoginPage> {
                 _isSignUp
                     ? "Your spots so far come with you — you're not starting over."
                     : 'Sign in to see your spots.',
-                style: GoogleFonts.plusJakartaSans(
+                style: GoogleFonts.fraunces(
                   fontSize: 13.5,
                   fontWeight: FontWeight.w500,
                   color: Tone.muted,
@@ -188,7 +191,7 @@ class _LoginPageState extends State<LoginPage> {
                             )
                           : Text(
                               _isSignUp ? 'Create account' : 'Sign in',
-                              style: GoogleFonts.plusJakartaSans(
+                              style: GoogleFonts.fraunces(
                                 fontSize: 15,
                                 fontWeight: FontWeight.w700,
                                 color: Colors.white,
@@ -211,10 +214,10 @@ class _LoginPageState extends State<LoginPage> {
                     _isSignUp
                         ? 'Already have an account? Sign in'
                         : "Don't have an account? Create one",
-                    style: GoogleFonts.plusJakartaSans(
+                    style: GoogleFonts.fraunces(
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
-                      color: Tone.teal,
+                      color: Tone.terracotta,
                     ),
                   ),
                 ),
@@ -228,7 +231,7 @@ class _LoginPageState extends State<LoginPage> {
 
   Widget _label(String text) => Text(
         text,
-        style: GoogleFonts.plusJakartaSans(
+        style: GoogleFonts.fraunces(
           fontSize: 11.5,
           fontWeight: FontWeight.w700,
           letterSpacing: 1.2,
@@ -248,13 +251,13 @@ class _LoginPageState extends State<LoginPage> {
         decoration: InputDecoration(
           border: InputBorder.none,
           hintText: hint,
-          hintStyle: GoogleFonts.plusJakartaSans(
+          hintStyle: GoogleFonts.fraunces(
             fontSize: 14.5,
             fontWeight: FontWeight.w500,
             color: Tone.muted,
           ),
         ),
-        style: GoogleFonts.plusJakartaSans(fontSize: 14.5, fontWeight: FontWeight.w600, color: Tone.ink),
+        style: GoogleFonts.fraunces(fontSize: 14.5, fontWeight: FontWeight.w600, color: Tone.ink),
       ),
     );
   }
@@ -263,18 +266,18 @@ class _LoginPageState extends State<LoginPage> {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Tone.coral.withValues(alpha: 0.1),
+        color: Tone.error.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.error_outline, size: 18, color: Tone.coral),
+          const Icon(Icons.error_outline, size: 18, color: Tone.error),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
               message,
-              style: GoogleFonts.plusJakartaSans(fontSize: 13, fontWeight: FontWeight.w600, color: Tone.coral),
+              style: GoogleFonts.fraunces(fontSize: 13, fontWeight: FontWeight.w600, color: Tone.error),
             ),
           ),
         ],

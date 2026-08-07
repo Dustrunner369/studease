@@ -269,26 +269,26 @@ class _AddSpotSheetState extends State<AddSpotSheet> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
         title: Text(
           "You've hit the guest limit",
-          style: GoogleFonts.plusJakartaSans(fontSize: 17, fontWeight: FontWeight.w800, color: Tone.ink),
+          style: GoogleFonts.fraunces(fontSize: 17, fontWeight: FontWeight.w800, color: Tone.ink),
         ),
         content: Text(
           'Guests can add up to $guestEntryLimit spots. Create an account to keep adding — '
           "and to keep the ones you've already added for good.",
-          style: GoogleFonts.plusJakartaSans(fontSize: 13.5, fontWeight: FontWeight.w500, color: Tone.muted),
+          style: GoogleFonts.fraunces(fontSize: 13.5, fontWeight: FontWeight.w500, color: Tone.muted),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(false),
             child: Text(
               'Not now',
-              style: GoogleFonts.plusJakartaSans(fontSize: 13.5, fontWeight: FontWeight.w700, color: Tone.muted),
+              style: GoogleFonts.fraunces(fontSize: 13.5, fontWeight: FontWeight.w700, color: Tone.muted),
             ),
           ),
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(true),
             child: Text(
               'Create account',
-              style: GoogleFonts.plusJakartaSans(fontSize: 13.5, fontWeight: FontWeight.w700, color: Tone.teal),
+              style: GoogleFonts.fraunces(fontSize: 13.5, fontWeight: FontWeight.w700, color: Tone.terracotta),
             ),
           ),
         ],
@@ -452,7 +452,7 @@ class _AddSpotSheetState extends State<AddSpotSheet> {
           Expanded(
             child: Text(
               'Add a spot',
-              style: GoogleFonts.plusJakartaSans(
+              style: GoogleFonts.fraunces(
                 fontSize: 21,
                 fontWeight: FontWeight.w800,
                 color: Tone.ink,
@@ -469,7 +469,7 @@ class _AddSpotSheetState extends State<AddSpotSheet> {
 
   Widget _buildSectionLabel(String text) => Text(
         text,
-        style: GoogleFonts.plusJakartaSans(
+        style: GoogleFonts.fraunces(
           fontSize: 11.5,
           fontWeight: FontWeight.w700,
           letterSpacing: 1.2,
@@ -501,13 +501,13 @@ class _AddSpotSheetState extends State<AddSpotSheet> {
                   decoration: InputDecoration(
                     border: InputBorder.none,
                     hintText: 'Search cafés, libraries…',
-                    hintStyle: GoogleFonts.plusJakartaSans(
+                    hintStyle: GoogleFonts.fraunces(
                       fontSize: 14.5,
                       fontWeight: FontWeight.w500,
                       color: Tone.muted,
                     ),
                   ),
-                  style: GoogleFonts.plusJakartaSans(
+                  style: GoogleFonts.fraunces(
                     fontSize: 14.5,
                     fontWeight: FontWeight.w600,
                     color: Tone.ink,
@@ -547,7 +547,7 @@ class _AddSpotSheetState extends State<AddSpotSheet> {
           const SizedBox(height: 8),
           Text(
             _searchNotice!,
-            style: GoogleFonts.plusJakartaSans(
+            style: GoogleFonts.fraunces(
               fontSize: 12.5,
               fontWeight: FontWeight.w500,
               color: Tone.muted,
@@ -562,10 +562,10 @@ class _AddSpotSheetState extends State<AddSpotSheet> {
           }),
           child: Text(
             "Can't find it? Add it by hand",
-            style: GoogleFonts.plusJakartaSans(
+            style: GoogleFonts.fraunces(
               fontSize: 13,
               fontWeight: FontWeight.w700,
-              color: Tone.teal,
+              color: Tone.terracotta,
             ),
           ),
         ),
@@ -595,7 +595,7 @@ class _AddSpotSheetState extends State<AddSpotSheet> {
                   children: [
                     Text(
                       place.name,
-                      style: GoogleFonts.plusJakartaSans(
+                      style: GoogleFonts.fraunces(
                         fontSize: 15,
                         fontWeight: FontWeight.w700,
                         color: Tone.ink,
@@ -605,7 +605,7 @@ class _AddSpotSheetState extends State<AddSpotSheet> {
                       const SizedBox(height: 2),
                       Text(
                         place.address,
-                        style: GoogleFonts.plusJakartaSans(
+                        style: GoogleFonts.fraunces(
                           fontSize: 12.5,
                           fontWeight: FontWeight.w500,
                           color: Tone.muted,
@@ -619,10 +619,10 @@ class _AddSpotSheetState extends State<AddSpotSheet> {
                 onPressed: () => setState(() => _selectedPlace = null),
                 child: Text(
                   'Change',
-                  style: GoogleFonts.plusJakartaSans(
+                  style: GoogleFonts.fraunces(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
-                    color: Tone.teal,
+                    color: Tone.terracotta,
                   ),
                 ),
               ),
@@ -652,10 +652,10 @@ class _AddSpotSheetState extends State<AddSpotSheet> {
           }),
           child: Text(
             'Search Google instead',
-            style: GoogleFonts.plusJakartaSans(
+            style: GoogleFonts.fraunces(
               fontSize: 13,
               fontWeight: FontWeight.w700,
-              color: Tone.teal,
+              color: Tone.terracotta,
             ),
           ),
         ),
@@ -684,7 +684,7 @@ class _AddSpotSheetState extends State<AddSpotSheet> {
               ),
               child: Text(
                 '#${label.slug}',
-                style: GoogleFonts.plusJakartaSans(
+                style: GoogleFonts.fraunces(
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
                   color: _selectedTagSlugs.contains(label.slug) ? Colors.white : Tone.muted,
@@ -726,10 +726,10 @@ class _AddSpotSheetState extends State<AddSpotSheet> {
                       )
                     : Text(
                         'Suggest',
-                        style: GoogleFonts.plusJakartaSans(
+                        style: GoogleFonts.fraunces(
                           fontSize: 13,
                           fontWeight: FontWeight.w700,
-                          color: Tone.teal,
+                          color: Tone.terracotta,
                         ),
                       ),
               ),
@@ -740,7 +740,7 @@ class _AddSpotSheetState extends State<AddSpotSheet> {
           const SizedBox(height: 8),
           Text(
             _labelRequestNotice!,
-            style: GoogleFonts.plusJakartaSans(
+            style: GoogleFonts.fraunces(
               fontSize: 12.5,
               fontWeight: FontWeight.w500,
               color: Tone.muted,
@@ -755,21 +755,21 @@ class _AddSpotSheetState extends State<AddSpotSheet> {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Tone.coral.withValues(alpha: 0.1),
+        color: Tone.error.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.error_outline, size: 18, color: Tone.coral),
+          const Icon(Icons.error_outline, size: 18, color: Tone.error),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
               _error!,
-              style: GoogleFonts.plusJakartaSans(
+              style: GoogleFonts.fraunces(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
-                color: Tone.coral,
+                color: Tone.error,
               ),
             ),
           ),
@@ -792,7 +792,7 @@ class _AddSpotSheetState extends State<AddSpotSheet> {
               padding: const EdgeInsets.only(bottom: 8),
               child: Text(
                 'Rate all six to save',
-                style: GoogleFonts.plusJakartaSans(
+                style: GoogleFonts.fraunces(
                   fontSize: 12.5,
                   fontWeight: FontWeight.w500,
                   color: Tone.muted,
@@ -821,7 +821,7 @@ class _AddSpotSheetState extends State<AddSpotSheet> {
                         )
                       : Text(
                           'Save spot',
-                          style: GoogleFonts.plusJakartaSans(
+                          style: GoogleFonts.fraunces(
                             fontSize: 15,
                             fontWeight: FontWeight.w700,
                             color: _canSave ? Colors.white : Tone.muted,
@@ -858,7 +858,7 @@ class _GroupStudyToggle extends StatelessWidget {
           Expanded(
             child: Text(
               'Good with a group',
-              style: GoogleFonts.plusJakartaSans(
+              style: GoogleFonts.fraunces(
                 fontSize: 14.5,
                 fontWeight: FontWeight.w600,
                 color: Tone.ink,
@@ -879,7 +879,7 @@ class _GroupStudyToggle extends StatelessWidget {
                   ),
                   child: Text(
                     label,
-                    style: GoogleFonts.plusJakartaSans(
+                    style: GoogleFonts.fraunces(
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
                       color: value == isYes ? Colors.white : Tone.muted,
@@ -922,7 +922,7 @@ class _RatingRow extends StatelessWidget {
           Expanded(
             child: Text(
               label,
-              style: GoogleFonts.plusJakartaSans(
+              style: GoogleFonts.fraunces(
                 fontSize: 14.5,
                 fontWeight: FontWeight.w600,
                 color: Tone.ink,
@@ -979,7 +979,7 @@ class _SuggestionRow extends StatelessWidget {
                     suggestion.name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.plusJakartaSans(
+                    style: GoogleFonts.fraunces(
                       fontSize: 14.5,
                       fontWeight: FontWeight.w700,
                       color: Tone.ink,
@@ -991,7 +991,7 @@ class _SuggestionRow extends StatelessWidget {
                       suggestion.address,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.plusJakartaSans(
+                      style: GoogleFonts.fraunces(
                         fontSize: 12.5,
                         fontWeight: FontWeight.w500,
                         color: Tone.muted,
@@ -1036,13 +1036,13 @@ class _TextField extends StatelessWidget {
         decoration: InputDecoration(
           border: InputBorder.none,
           hintText: hint,
-          hintStyle: GoogleFonts.plusJakartaSans(
+          hintStyle: GoogleFonts.fraunces(
             fontSize: 14.5,
             fontWeight: FontWeight.w500,
             color: Tone.muted,
           ),
         ),
-        style: GoogleFonts.plusJakartaSans(
+        style: GoogleFonts.fraunces(
           fontSize: 14.5,
           fontWeight: FontWeight.w600,
           color: Tone.ink,
