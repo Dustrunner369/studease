@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -14,6 +15,7 @@ import 'package:mobile/design/illustrations.dart';
 import 'package:mobile/design/motion_widgets.dart';
 import 'package:mobile/design/theme.dart';
 import 'package:fuzzy/fuzzy.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -471,7 +473,9 @@ class _SpotsPageState extends State<SpotsPage> {
             key: ValueKey(visible[i].entryId),
             rank: i + 1,
             spot: visible[i],
+            auth: widget.auth,
             onDismissed: () => _deleteSpot(visible[i]),
+            onChanged: _load,
           ),
         ),
         const Padding(
@@ -694,13 +698,19 @@ class _ErrorBox extends StatelessWidget {
 class _DismissibleSpotRow extends StatelessWidget {
   final int rank;
   final MySpotListItem spot;
+  final AuthController auth;
   final VoidCallback onDismissed;
+
+  /// Called after the detail sheet reports a saved edit, so the list can refetch.
+  final VoidCallback onChanged;
 
   const _DismissibleSpotRow({
     super.key,
     required this.rank,
     required this.spot,
+    required this.auth,
     required this.onDismissed,
+    required this.onChanged,
   });
 
   @override
@@ -715,7 +725,7 @@ class _DismissibleSpotRow extends StatelessWidget {
         padding: const EdgeInsets.only(right: 24),
         child: const Icon(Icons.delete_outline, color: Colors.white),
       ),
-      child: SpotRow(rank: rank, spot: spot),
+      child: SpotRow(rank: rank, spot: spot, auth: auth, onChanged: onChanged),
     );
   }
 }
@@ -723,18 +733,29 @@ class _DismissibleSpotRow extends StatelessWidget {
 class SpotRow extends StatelessWidget {
   final int rank;
   final MySpotListItem spot;
+  final AuthController auth;
+  final VoidCallback onChanged;
 
-  const SpotRow({super.key, required this.rank, required this.spot});
+  const SpotRow({
+    super.key,
+    required this.rank,
+    required this.spot,
+    required this.auth,
+    required this.onChanged,
+  });
 
   @override
   Widget build(BuildContext context) {
     return PressScale(
-      onTap: () => showModalBottomSheet(
-        context: context,
-        backgroundColor: Colors.transparent,
-        isScrollControlled: true,
-        builder: (_) => SpotDetailSheet(spot: spot),
-      ),
+      onTap: () async {
+        final changed = await showModalBottomSheet<bool>(
+          context: context,
+          backgroundColor: Colors.transparent,
+          isScrollControlled: true,
+          builder: (_) => SpotDetailSheet(spot: spot, auth: auth),
+        );
+        if (changed == true) onChanged();
+      },
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
         child: Row(
@@ -889,25 +910,53 @@ class _ScoreBubble extends StatelessWidget {
 
 class SpotDetailSheet extends StatelessWidget {
   final MySpotListItem spot;
+  final AuthController auth;
 
-  const SpotDetailSheet({super.key, required this.spot});
+  const SpotDetailSheet({super.key, required this.spot, required this.auth});
 
+  // Reuses the add-spot sheet in edit mode: same fields, same save call, pre-filled
+  // from this entry. Closes this sheet too on a real save, so the list underneath
+  // (told via the pop's `true`) knows to refetch rather than showing stale ratings.
+  Future<void> _editSpot(BuildContext context) async {
+    final saved = await showAddSpotSheet(context, auth, existing: spot);
+    if (saved == true && context.mounted) Navigator.of(context).pop(true);
+  }
+
+  // A SnackBar anchors to the nearest ScaffoldMessenger, which for a sheet opened
+  // via showModalBottomSheet is the app's root one — sitting in an overlay *below*
+  // this sheet's own route, so it renders hidden behind it. A dialog route stacks
+  // on the same Navigator as the sheet, always on top, so it's used here instead.
   void _soon(BuildContext context, String message) {
-    ScaffoldMessenger.of(context).hideCurrentSnackBar();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        behavior: SnackBarBehavior.floating,
-        backgroundColor: Tone.ink,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        content: Text(
-          message,
-          style: GoogleFonts.fraunces(
-            color: Colors.white,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ),
+    showGeneralDialog(
+      context: context,
+      barrierLabel: message,
+      barrierColor: Colors.black26,
+      barrierDismissible: true,
+      transitionDuration: const Duration(milliseconds: 150),
+      pageBuilder: (context, animation, secondaryAnimation) => _Toast(message: message),
     );
+  }
+
+  // Apple Maps on iOS, Google Maps elsewhere — each is the platform's default map
+  // app, so this opens directions without asking the user to pick anything. No
+  // googlePlaceId lives on MySpotListItem, so the destination is address text
+  // rather than a precise place lookup — and a name-only search routes to
+  // whichever place best matches the name, not necessarily this one, so it's
+  // refused rather than risking a wrong destination.
+  Future<void> _openDirections(BuildContext context) async {
+    final address = spot.address;
+    if (address == null || address.isEmpty) {
+      _soon(context, 'No address found');
+      return;
+    }
+    final query = Uri.encodeComponent(address);
+
+    final uri = Platform.isIOS
+        ? Uri.parse('https://maps.apple.com/?daddr=$query')
+        : Uri.parse('https://www.google.com/maps/dir/?api=1&destination=$query');
+
+    final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!opened && context.mounted) _soon(context, "Couldn't open Maps");
   }
 
   @override
@@ -1116,8 +1165,7 @@ class SpotDetailSheet extends StatelessWidget {
                         label: 'Directions',
                         icon: Icons.near_me,
                         filled: true,
-                        onTap: () =>
-                            _soon(context, 'Directions — coming soon'),
+                        onTap: () => _openDirections(context),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -1126,12 +1174,59 @@ class SpotDetailSheet extends StatelessWidget {
                         label: 'Edit spot',
                         icon: Icons.edit_outlined,
                         filled: false,
-                        onTap: () => _soon(context, 'Edit spot — coming soon'),
+                        onTap: () => _editSpot(context),
                       ),
                     ),
                   ],
                 ),
               ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A SnackBar-styled toast shown as its own dialog route rather than a real
+/// SnackBar — see [SpotDetailSheet._soon] for why. Auto-dismisses; tapping the
+/// barrier behind it dismisses early.
+class _Toast extends StatefulWidget {
+  final String message;
+
+  const _Toast({required this.message});
+
+  @override
+  State<_Toast> createState() => _ToastState();
+}
+
+class _ToastState extends State<_Toast> {
+  @override
+  void initState() {
+    super.initState();
+    Future.delayed(const Duration(seconds: 2), () {
+      if (mounted) Navigator.of(context).pop();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Material(
+        color: Colors.transparent,
+        child: Container(
+          margin: const EdgeInsets.symmetric(horizontal: 48),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+          decoration: BoxDecoration(
+            color: Tone.ink,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Text(
+            widget.message,
+            textAlign: TextAlign.center,
+            style: GoogleFonts.fraunces(
+              color: Colors.white,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ),

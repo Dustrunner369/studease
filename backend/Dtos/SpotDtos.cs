@@ -24,6 +24,11 @@ public record CreateSpotRequest(
     string? Name,
     string? Address);
 
+// Corrects the shared place record's own Name/Address in place — most often filling in
+// an address a manually-entered spot never had. Never touches GooglePlaceId or
+// coordinates; those only ever come from a Places lookup, which this doesn't re-run.
+public record UpdateSpotRequest(string Name, string? Address);
+
 // GroupStudy is nullable on the way in only so an older client that omits it gets a
 // default of false rather than a 400. Ratings stay required and complete. TagSlugs is
 // nullable/omittable the same way - null or missing means "no tags", not an error -

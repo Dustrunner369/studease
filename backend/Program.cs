@@ -419,6 +419,37 @@ registered.MapPost("/spots", async (
     return Results.Created($"/spots/{spot.Id}", await ToDetailDto(spot, db, places, userId, ct));
 });
 
+// Edits an existing spot's own Name/Address — the shared record, not any one entry.
+// Used by the edit-spot flow to fix or add an address a manually-entered spot never
+// had; Address may be cleared back to null, Name may not.
+registered.MapPut("/spots/{id:guid}", async (
+    Guid id,
+    UpdateSpotRequest request,
+    AppDbContext db,
+    PlacesClient places,
+    CurrentUser currentUser,
+    CancellationToken ct) =>
+{
+    if (string.IsNullOrWhiteSpace(request.Name))
+    {
+        return Results.ValidationProblem(new Dictionary<string, string[]>
+        {
+            ["name"] = ["A spot needs a name."],
+        });
+    }
+
+    var spot = await db.Spots.FirstOrDefaultAsync(s => s.Id == id, ct);
+    if (spot is null) return Results.NotFound();
+
+    spot.Name = request.Name.Trim();
+    spot.FormattedAddress = Trimmed(request.Address);
+
+    await db.SaveChangesAsync(ct);
+
+    var userId = await currentUser.IdAsync(ct);
+    return Results.Ok(await ToDetailDto(spot, db, places, userId, ct));
+});
+
 // The ranked list behind the Spots tab: my entries, best first.
 registered.MapGet("/me/spots", async (AppDbContext db, CurrentUser currentUser, CancellationToken ct) =>
 {

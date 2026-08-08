@@ -10,19 +10,28 @@ import 'package:mobile/models/spot.dart';
 import 'package:mobile/services/api_service.dart';
 import 'package:mobile/services/auth_controller.dart';
 
-Future<bool?> showAddSpotSheet(BuildContext context, AuthController auth) {
+/// Pass [existing] to open in edit mode: every field pre-filled from that entry,
+/// including name/address (editable — see [AddSpotSheet._save], which corrects the
+/// shared place record rather than re-linking to a different one), saving updates the
+/// same entry instead of creating one.
+Future<bool?> showAddSpotSheet(
+  BuildContext context,
+  AuthController auth, {
+  MySpotListItem? existing,
+}) {
   return showModalBottomSheet<bool>(
     context: context,
     backgroundColor: Colors.transparent,
     isScrollControlled: true,
-    builder: (_) => AddSpotSheet(auth: auth),
+    builder: (_) => AddSpotSheet(auth: auth, existing: existing),
   );
 }
 
 class AddSpotSheet extends StatefulWidget {
   final AuthController auth;
+  final MySpotListItem? existing;
 
-  const AddSpotSheet({super.key, required this.auth});
+  const AddSpotSheet({super.key, required this.auth, this.existing});
 
   @override
   State<AddSpotSheet> createState() => _AddSpotSheetState();
@@ -72,6 +81,22 @@ class _AddSpotSheetState extends State<AddSpotSheet> {
     // The save button enables as soon as a name exists, so it has to track typing.
     _nameController.addListener(_onFormChanged);
     _loadLabels();
+
+    final existing = widget.existing;
+    if (existing != null) {
+      _nameController.text = existing.name;
+      _addressController.text = existing.address ?? '';
+      _orderController.text = existing.coffeeOrder ?? '';
+      _notesController.text = existing.notes ?? '';
+      _selectedTagSlugs.addAll(existing.tags);
+      _groupStudy = existing.groupStudy;
+      _wifi = existing.ratings.wifi;
+      _quiet = existing.ratings.noise;
+      _outlets = existing.ratings.outlets;
+      _seating = existing.ratings.seating;
+      _tableSize = existing.ratings.tableSize;
+      _coffee = existing.ratings.coffee;
+    }
   }
 
   @override
@@ -216,14 +241,25 @@ class _AddSpotSheetState extends State<AddSpotSheet> {
 
     try {
       // Two calls on purpose: the place is shared by everyone, the rating is mine.
-      final spot = await createSpot(
-        googlePlaceId: _selectedPlace?.googlePlaceId,
-        name: _selectedPlace == null ? _nameController.text.trim() : null,
-        address: _selectedPlace == null ? _trimmedOrNull(_addressController) : null,
-      );
+      // Editing an existing entry still touches the place — updateSpot corrects its
+      // Name/Address in place — but never re-links it to a different Google place;
+      // only a fresh Places search (createSpot) can do that.
+      final spotId = widget.existing != null
+          ? (await updateSpot(
+              spotId: widget.existing!.spotId,
+              name: _nameController.text.trim(),
+              address: _trimmedOrNull(_addressController),
+            ))
+              .id
+          : (await createSpot(
+              googlePlaceId: _selectedPlace?.googlePlaceId,
+              name: _selectedPlace == null ? _nameController.text.trim() : null,
+              address: _selectedPlace == null ? _trimmedOrNull(_addressController) : null,
+            ))
+              .id;
 
       await saveEntry(
-        spotId: spot.id,
+        spotId: spotId,
         ratings: Ratings(
           wifi: _wifi!,
           noise: _quiet!,
@@ -342,7 +378,9 @@ class _AddSpotSheetState extends State<AddSpotSheet> {
                       children: [
                         _buildTitle(),
                         const SizedBox(height: 18),
-                        if (_selectedPlace != null)
+                        if (widget.existing != null)
+                          _buildManualFields()
+                        else if (_selectedPlace != null)
                           _buildSelectedPlace()
                         else if (_manualEntry)
                           _buildManualFields()
@@ -450,7 +488,7 @@ class _AddSpotSheetState extends State<AddSpotSheet> {
         children: [
           Expanded(
             child: Text(
-              'Add a spot',
+              widget.existing != null ? 'Edit spot' : 'Add a spot',
               style: GoogleFonts.fraunces(
                 fontSize: 21,
                 fontWeight: FontWeight.w800,
@@ -632,32 +670,40 @@ class _AddSpotSheetState extends State<AddSpotSheet> {
     );
   }
 
+  // Doubles as the edit-mode WHERE section: editing a rating still lets you correct
+  // or add the shared place's name/address (updateSpot), just never re-run a Places
+  // search to retarget the entry at a different place entirely — the "Search Google
+  // instead" way out of manual entry only makes sense while still picking a place.
   Widget _buildManualFields() {
+    final editing = widget.existing != null;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildSectionLabel('NAME'),
         const SizedBox(height: 8),
-        _TextField(controller: _nameController, hint: 'Brew & Books', autofocus: true),
+        _TextField(controller: _nameController, hint: 'Brew & Books', autofocus: !editing),
         const SizedBox(height: 16),
         _buildSectionLabel('ADDRESS'),
         const SizedBox(height: 8),
         _TextField(controller: _addressController, hint: '123 Library Lane'),
-        const SizedBox(height: 10),
-        GestureDetector(
-          onTap: () => setState(() {
-            _manualEntry = false;
-            _searchNotice = null;
-          }),
-          child: Text(
-            'Search Google instead',
-            style: GoogleFonts.fraunces(
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              color: Tone.terracotta,
+        if (!editing) ...[
+          const SizedBox(height: 10),
+          GestureDetector(
+            onTap: () => setState(() {
+              _manualEntry = false;
+              _searchNotice = null;
+            }),
+            child: Text(
+              'Search Google instead',
+              style: GoogleFonts.fraunces(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: Tone.terracotta,
+              ),
             ),
           ),
-        ),
+        ],
       ],
     );
   }
@@ -712,7 +758,7 @@ class _AddSpotSheetState extends State<AddSpotSheet> {
             GestureDetector(
               onTap: _requestingLabel ? null : _requestLabel,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
                 decoration: BoxDecoration(
                   color: Tone.field,
                   borderRadius: BorderRadius.circular(14),
@@ -819,7 +865,7 @@ class _AddSpotSheetState extends State<AddSpotSheet> {
                           ),
                         )
                       : Text(
-                          'Save spot',
+                          widget.existing != null ? 'Save changes' : 'Save spot',
                           style: GoogleFonts.fraunces(
                             fontSize: 15,
                             fontWeight: FontWeight.w700,

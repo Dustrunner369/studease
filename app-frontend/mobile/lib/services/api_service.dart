@@ -133,6 +133,23 @@ Future<SpotDetail> createSpot({
   return SpotDetail.fromJson(data as Map<String, dynamic>);
 }
 
+/// Corrects a spot's own name/address — the shared record, not any one entry. Used
+/// by the edit-spot flow, most often to add an address a manually-entered spot never
+/// had. Doesn't touch googlePlaceId or coordinates; only a fresh Places lookup can.
+Future<SpotDetail> updateSpot({
+  required String spotId,
+  required String name,
+  String? address,
+}) async {
+  final data = await _send((headers) => http.put(
+        Uri.parse('$baseUrl/spots/$spotId'),
+        headers: headers,
+        body: json.encode({'name': name, 'address': address}),
+      ));
+
+  return SpotDetail.fromJson(data as Map<String, dynamic>);
+}
+
 /// Saves my rating of a spot. Rating a place twice updates the same entry rather
 /// than adding a second one, so this doubles as the edit call.
 ///
