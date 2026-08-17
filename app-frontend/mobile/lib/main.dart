@@ -11,7 +11,6 @@ import 'package:mobile/features/study_spots/presentation/add_spot_sheet.dart';
 import 'package:mobile/services/auth_controller.dart';
 import 'package:mobile/services/api_service.dart';
 import 'package:mobile/models/spot.dart';
-import 'package:mobile/design/illustrations.dart';
 import 'package:mobile/design/motion_widgets.dart';
 import 'package:mobile/design/theme.dart';
 import 'package:fuzzy/fuzzy.dart';
@@ -446,8 +445,6 @@ class _SpotsPageState extends State<SpotsPage> {
           child: Center(
             child: Column(
               children: [
-                const MokaPotSketch(size: 96, color: Tone.muted),
-                const SizedBox(height: Space.md),
                 Text(
                   _filterTags.isEmpty
                       ? 'No spots yet — tap + to add one'
