@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Npgsql;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -30,7 +31,10 @@ builder.Services.AddCors(options =>
     });
 });
 
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+var connectionString = NormalizeConnectionString(
+    builder.Configuration.GetConnectionString("DefaultConnection"));
+var migrationConnectionString = NormalizeConnectionString(
+    builder.Configuration.GetConnectionString("Migrations")) ?? connectionString;
 
 builder.Services.AddDbContext<AppDbContext>(opt =>
     opt.UseNpgsql(connectionString).UseSnakeCaseNamingConvention());
@@ -107,10 +111,16 @@ if (allowDevBypass)
 // NOTE: fine while this is a one-person project, but this means a container restart
 // runs whatever migration shipped in the image — including a destructive one. Make it
 // a deliberate step before anyone else's data is in here.
-using (var scope = app.Services.CreateScope())
+// Runs over ConnectionStrings:Migrations (Neon's direct/unpooled connection) rather than
+// the app's pooled one - PgBouncer's transaction pooling doesn't reliably support the
+// advisory locks and session state EF's migrator relies on.
+var migrationOptions = new DbContextOptionsBuilder<AppDbContext>()
+    .UseNpgsql(migrationConnectionString)
+    .UseSnakeCaseNamingConvention()
+    .Options;
+using (var migrationContext = new AppDbContext(migrationOptions))
 {
-    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    db.Database.Migrate();
+    migrationContext.Database.Migrate();
 }
 
 app.UseCors();
@@ -246,7 +256,7 @@ registered.MapGet("/labels", async (AppDbContext db, CancellationToken ct) =>
     await db.Labels
         .Where(l => l.Status == LabelStatuses.Approved)
         .OrderBy(l => l.Slug)
-        .Select(l => new LabelDto(l.Id, l.Slug, l.DisplayName, l.Status))
+        .Select(l => new LabelDto(l.Id, l.Slug, l.DisplayName, l.Status, l.Polarity))
         .ToListAsync(ct));
 
 // Requests a new label. Idempotent by slug, same shape as POST /spots: an existing
@@ -278,7 +288,7 @@ registered.MapPost("/labels", async (
                 statusCode: StatusCodes.Status409Conflict);
         }
 
-        return Results.Ok(new LabelDto(existing.Id, existing.Slug, existing.DisplayName, existing.Status));
+        return Results.Ok(new LabelDto(existing.Id, existing.Slug, existing.DisplayName, existing.Status, existing.Polarity));
     }
 
     var requestedBy = await currentUser.IdAsync(ct);
@@ -297,7 +307,7 @@ registered.MapPost("/labels", async (
 
     return Results.Created(
         $"/labels/{created.Id}",
-        new LabelDto(created.Id, created.Slug, created.DisplayName, created.Status));
+        new LabelDto(created.Id, created.Slug, created.DisplayName, created.Status, created.Polarity));
 });
 
 // ---------------------------------------------------------------------------
@@ -315,17 +325,28 @@ admin.MapGet("/admin/labels/pending", async (AppDbContext db, CancellationToken 
         .Select(l => new PendingLabelDto(l.Id, l.Slug, l.DisplayName, l.RequestedBy, l.CreatedAt))
         .ToListAsync(ct));
 
+// The requester never picks positive/negative (see RequestLabelRequest) — approval is
+// where that call gets made, so it's a required argument here rather than a default.
 admin.MapPost("/admin/labels/{id:guid}/approve", async (
-    Guid id, CurrentUser currentUser, AppDbContext db, CancellationToken ct) =>
+    Guid id, ApproveLabelRequest request, CurrentUser currentUser, AppDbContext db, CancellationToken ct) =>
 {
+    if (!LabelPolarities.IsValid(request.Polarity))
+    {
+        return Results.ValidationProblem(new Dictionary<string, string[]>
+        {
+            ["polarity"] = ["Polarity must be 'positive' or 'negative'."],
+        });
+    }
+
     var label = await db.Labels.FirstOrDefaultAsync(l => l.Id == id, ct);
     if (label is null) return Results.NotFound();
 
     label.Status = LabelStatuses.Approved;
+    label.Polarity = request.Polarity;
     label.ApprovedBy = await currentUser.IdAsync(ct);
     await db.SaveChangesAsync(ct);
 
-    return Results.Ok(new LabelDto(label.Id, label.Slug, label.DisplayName, label.Status));
+    return Results.Ok(new LabelDto(label.Id, label.Slug, label.DisplayName, label.Status, label.Polarity));
 });
 
 admin.MapPost("/admin/labels/{id:guid}/reject", async (
@@ -338,7 +359,7 @@ admin.MapPost("/admin/labels/{id:guid}/reject", async (
     label.ApprovedBy = await currentUser.IdAsync(ct);
     await db.SaveChangesAsync(ct);
 
-    return Results.Ok(new LabelDto(label.Id, label.Slug, label.DisplayName, label.Status));
+    return Results.Ok(new LabelDto(label.Id, label.Slug, label.DisplayName, label.Status, label.Polarity));
 });
 
 // ---------------------------------------------------------------------------
@@ -604,6 +625,30 @@ app.Run();
 
 static string? Trimmed(string? value) =>
     string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+// Npgsql only understands the keyword=value ADO.NET format, but Neon (and most managed
+// Postgres providers) hand out postgres:// URIs - translate when we see one.
+static string? NormalizeConnectionString(string? value)
+{
+    if (string.IsNullOrEmpty(value)
+        || !Uri.TryCreate(value, UriKind.Absolute, out var uri)
+        || uri.Scheme is not ("postgres" or "postgresql"))
+    {
+        return value;
+    }
+
+    var userInfo = uri.UserInfo.Split(':', 2);
+
+    return new NpgsqlConnectionStringBuilder
+    {
+        Host = uri.Host,
+        Port = uri.Port == -1 ? 5432 : uri.Port,
+        Database = uri.AbsolutePath.TrimStart('/'),
+        Username = Uri.UnescapeDataString(userInfo[0]),
+        Password = userInfo.Length > 1 ? Uri.UnescapeDataString(userInfo[1]) : null,
+        SslMode = SslMode.Require,
+    }.ToString();
+}
 
 static Dictionary<string, string[]> ValidateRatings(RatingsDto? ratings)
 {

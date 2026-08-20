@@ -33,6 +33,7 @@ class _PressScaleState extends State<PressScale> {
 
     return GestureDetector(
       onTap: widget.onTap,
+      behavior: HitTestBehavior.opaque,
       onTapDown: (_) => _setPressed(true),
       onTapUp: (_) => _setPressed(false),
       onTapCancel: () => _setPressed(false),

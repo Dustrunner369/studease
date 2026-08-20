@@ -46,7 +46,7 @@ class ProfilePage extends StatelessWidget {
           },
         ),
       ),
-      bottomNavigationBar: CleanBottomNav(currentIndex: 2, auth: auth),
+      bottomNavigationBar: CleanBottomNav(currentIndex: 1, auth: auth),
     );
   }
 }

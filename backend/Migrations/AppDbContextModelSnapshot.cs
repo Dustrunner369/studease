@@ -61,6 +61,10 @@ namespace study_spot_backend.Migrations
                         .HasColumnType("text")
                         .HasColumnName("display_name");
 
+                    b.Property<string>("Polarity")
+                        .HasColumnType("text")
+                        .HasColumnName("polarity");
+
                     b.Property<Guid?>("RequestedBy")
                         .HasColumnType("uuid")
                         .HasColumnName("requested_by");
@@ -95,6 +99,8 @@ namespace study_spot_backend.Migrations
 
                     b.ToTable("labels", null, t =>
                         {
+                            t.HasCheckConstraint("ck_labels_polarity_valid", "polarity IS NULL OR polarity IN ('positive', 'negative')");
+
                             t.HasCheckConstraint("ck_labels_slug_format", "slug ~ '^[a-z0-9]{2,30}$'");
 
                             t.HasCheckConstraint("ck_labels_status_valid", "status IN ('pending', 'approved', 'rejected')");

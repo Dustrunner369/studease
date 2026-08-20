@@ -27,9 +27,6 @@ Thumbs.db
 .env.*
 !.env.example
 
-# Postgres data
-pgdata/
-
 .claude/worktrees/
 
 .impeccable.md

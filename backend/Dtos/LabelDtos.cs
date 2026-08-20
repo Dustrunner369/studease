@@ -2,9 +2,11 @@ namespace study_spot_backend.Dtos;
 
 // The standardized tag vocabulary. See Models/Label.cs and context/api-contracts.md.
 
-public record LabelDto(Guid Id, string Slug, string DisplayName, string Status);
+public record LabelDto(Guid Id, string Slug, string DisplayName, string Status, string? Polarity);
 
 public record RequestLabelRequest(string Name);
+
+public record ApproveLabelRequest(string Polarity);
 
 // A spot-level aggregate row from SpotTagCount — how many (non-private) entries on
 // this spot carry the label. Distinct from the flat string[] slugs on SpotEntryDto/

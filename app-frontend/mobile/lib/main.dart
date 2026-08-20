@@ -1332,8 +1332,8 @@ class _SheetButton extends StatelessWidget {
 // Bottom nav
 // ---------------------------------------------------------------------------
 
-/// Each tab is its own full Scaffold rather than one shared shell — see SpotsPage,
-/// _MapComingSoonPage, and ProfilePage — so switching tabs is a plain
+/// Each tab is its own full Scaffold rather than one shared shell — see SpotsPage
+/// and ProfilePage — so switching tabs is a plain
 /// pushReplacement rather than an IndexedStack. Smallest thing that works without
 /// go_router or lifting SpotsPage's FAB/list state up into a shell; see
 /// context/auth-plan.md on deferring routing changes.
@@ -1348,7 +1348,6 @@ class CleanBottomNav extends StatelessWidget {
 
     final page = switch (index) {
       0 => SpotsPage(auth: auth),
-      1 => _MapComingSoonPage(auth: auth),
       _ => ProfilePage(auth: auth),
     };
 
@@ -1376,16 +1375,10 @@ class CleanBottomNav extends StatelessWidget {
                 onTap: () => _select(context, 0),
               ),
               _NavItem(
-                icon: Icons.map_outlined,
-                label: 'Map',
-                active: currentIndex == 1,
-                onTap: () => _select(context, 1),
-              ),
-              _NavItem(
                 icon: Icons.person_outline,
                 label: 'Profile',
-                active: currentIndex == 2,
-                onTap: () => _select(context, 2),
+                active: currentIndex == 1,
+                onTap: () => _select(context, 1),
               ),
             ],
           ),
@@ -1437,23 +1430,3 @@ class _NavItem extends StatelessWidget {
   }
 }
 
-class _MapComingSoonPage extends StatelessWidget {
-  final AuthController auth;
-
-  const _MapComingSoonPage({required this.auth});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: SafeArea(
-        child: Center(
-          child: Text(
-            'Map — coming soon',
-            style: GoogleFonts.fraunces(fontSize: 14, fontWeight: FontWeight.w600, color: Tone.muted),
-          ),
-        ),
-      ),
-      bottomNavigationBar: CleanBottomNav(currentIndex: 1, auth: auth),
-    );
-  }
-}

@@ -11,6 +11,20 @@ public static class LabelStatuses
     public static bool IsValid(string? value) => value is not null && All.Contains(value);
 }
 
+// A tag reads as either a compliment or a complaint — "Cozy" vs "Too loud". The
+// requester never picks this; it's decided by whoever approves the request (see
+// Program.cs POST /admin/labels/{id}/approve), which is what keeps a requester from
+// sneaking a negative-sounding tag in as positive or vice versa.
+public static class LabelPolarities
+{
+    public const string Positive = "positive";
+    public const string Negative = "negative";
+
+    public static readonly string[] All = [Positive, Negative];
+
+    public static bool IsValid(string? value) => value is not null && All.Contains(value);
+}
+
 // One entry in the standardized, global tag vocabulary — replaces the old per-spot
 // Type. Applied per SpotEntry (one user's opinion, see SpotEntry.Tags), never directly
 // on Spot. A user requests a label by name; it starts Pending and is unusable until an
@@ -32,6 +46,9 @@ public class Label : ITimestamped
     public required string DisplayName { get; set; }
 
     public string Status { get; set; } = LabelStatuses.Pending;
+
+    // Null until approved — a Pending or Rejected label was never assigned one.
+    public string? Polarity { get; set; }
 
     public Guid? RequestedBy { get; set; }
     public Guid? ApprovedBy { get; set; } // set on reject too — "who reviewed this"

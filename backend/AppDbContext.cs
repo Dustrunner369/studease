@@ -114,6 +114,9 @@ namespace study_spot_backend
                     // slugs render as #cozy in the picker/filter chips. A hyphen would
                     // break that the way #best-for-reading reads as broken elsewhere.
                     t.HasCheckConstraint("ck_labels_slug_format", "slug ~ '^[a-z0-9]{2,30}$'");
+                    // Null only while pending/rejected — set exactly once, at approval.
+                    t.HasCheckConstraint("ck_labels_polarity_valid",
+                        "polarity IS NULL OR polarity IN ('positive', 'negative')");
                 });
             });
 

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:mobile/design/theme.dart';
 import 'package:mobile/features/authentication/presentation/login_page.dart';
+import 'package:mobile/features/study_spots/presentation/tag_picker_page.dart';
 import 'package:mobile/models/label.dart';
 import 'package:mobile/models/me.dart';
 import 'package:mobile/models/spot.dart';
@@ -43,7 +44,6 @@ class _AddSpotSheetState extends State<AddSpotSheet> {
   final _addressController = TextEditingController();
   final _orderController = TextEditingController();
   final _notesController = TextEditingController();
-  final _labelRequestController = TextEditingController();
 
   PlaceSuggestion? _selectedPlace;
   List<PlaceSuggestion> _suggestions = [];
@@ -58,8 +58,6 @@ class _AddSpotSheetState extends State<AddSpotSheet> {
   // entry carries. Optional — unlike the ratings below, an untagged spot still saves.
   List<Label> _availableLabels = [];
   final Set<String> _selectedTagSlugs = {};
-  bool _requestingLabel = false;
-  String? _labelRequestNotice;
 
   int? _wifi;
   int? _quiet;
@@ -108,7 +106,6 @@ class _AddSpotSheetState extends State<AddSpotSheet> {
     _addressController.dispose();
     _orderController.dispose();
     _notesController.dispose();
-    _labelRequestController.dispose();
     super.dispose();
   }
 
@@ -185,42 +182,23 @@ class _AddSpotSheetState extends State<AddSpotSheet> {
     }
   }
 
-  Future<void> _requestLabel() async {
-    final name = _labelRequestController.text.trim();
-    if (name.isEmpty) return;
+  Future<void> _openTagPicker() async {
+    final result = await showTagPickerPage(
+      context,
+      availableLabels: _availableLabels,
+      selectedSlugs: _selectedTagSlugs,
+    );
+    if (result == null || !mounted) return;
 
     setState(() {
-      _requestingLabel = true;
-      _labelRequestNotice = null;
+      _selectedTagSlugs
+        ..clear()
+        ..addAll(result);
     });
 
-    try {
-      final label = await requestLabel(name);
-      if (!mounted) return;
-
-      setState(() {
-        _requestingLabel = false;
-        _labelRequestController.clear();
-
-        if (label.status == 'approved') {
-          // Dedupe hit on an already-approved label — usable immediately.
-          if (!_availableLabels.any((l) => l.id == label.id)) {
-            _availableLabels = [..._availableLabels, label]
-              ..sort((a, b) => a.slug.compareTo(b.slug));
-          }
-          _selectedTagSlugs.add(label.slug);
-          _labelRequestNotice = "#${label.slug} already exists — added it.";
-        } else {
-          _labelRequestNotice = "#${label.slug} submitted for review — usable once approved.";
-        }
-      });
-    } on ApiException catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _requestingLabel = false;
-        _labelRequestNotice = e.message;
-      });
-    }
+    // A "Suggest a New Tag" dedupe hit inside the picker may have added a label
+    // this sheet doesn't know about yet — refetch so its chip can render.
+    unawaited(_loadLabels());
   }
 
   void _selectPlace(PlaceSuggestion place) {
@@ -389,11 +367,7 @@ class _AddSpotSheetState extends State<AddSpotSheet> {
                         const SizedBox(height: 22),
                         _buildSectionLabel('TAGS'),
                         const SizedBox(height: 10),
-                        if (_availableLabels.isNotEmpty) ...[
-                          _buildTagPicker(),
-                          const SizedBox(height: 12),
-                        ],
-                        _buildLabelRequest(),
+                        _buildTagSection(),
                         const SizedBox(height: 22),
                         _buildSectionLabel('RATE IT'),
                         const SizedBox(height: 4),
@@ -670,10 +644,6 @@ class _AddSpotSheetState extends State<AddSpotSheet> {
     );
   }
 
-  // Doubles as the edit-mode WHERE section: editing a rating still lets you correct
-  // or add the shared place's name/address (updateSpot), just never re-run a Places
-  // search to retarget the entry at a different place entirely — the "Search Google
-  // instead" way out of manual entry only makes sense while still picking a place.
   Widget _buildManualFields() {
     final editing = widget.existing != null;
 
@@ -708,93 +678,67 @@ class _AddSpotSheetState extends State<AddSpotSheet> {
     );
   }
 
-  // Text-only pills, no icon — arbitrary tags have no fixed icon set, unlike the old
-  // per-type picker this replaces. Same chip shape/color language as the filter chips
-  // in main.dart's _buildFilters, just tappable-to-select instead of tappable-to-filter.
-  Widget _buildTagPicker() {
+  /// An "Add Tag" pill that opens the full-page picker, plus a removable chip for
+  /// each tag already applied — ink for positive, the same rust as everything else
+  /// in the app that means "bad" for negative (see Tone.error). Tapping a chip's ×
+  /// drops it without reopening the picker.
+  Widget _buildTagSection() {
+    final selected = _availableLabels.where((l) => _selectedTagSlugs.contains(l.slug)).toList();
+
     return Wrap(
       spacing: 8,
       runSpacing: 8,
       children: [
-        for (final label in _availableLabels)
-          GestureDetector(
-            onTap: () => setState(() {
-              if (!_selectedTagSlugs.remove(label.slug)) _selectedTagSlugs.add(label.slug);
-            }),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-              decoration: BoxDecoration(
-                color: _selectedTagSlugs.contains(label.slug) ? Tone.ink : Tone.field,
-                borderRadius: BorderRadius.circular(999),
-              ),
-              child: Text(
-                '#${label.slug}',
-                style: GoogleFonts.fraunces(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: _selectedTagSlugs.contains(label.slug) ? Colors.white : Tone.muted,
+        GestureDetector(
+          onTap: _openTagPicker,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+            decoration: BoxDecoration(
+              color: Tone.field,
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.add, size: 15, color: Tone.terracotta),
+                const SizedBox(width: 4),
+                Text(
+                  'Add Tag',
+                  style: GoogleFonts.fraunces(fontSize: 13, fontWeight: FontWeight.w700, color: Tone.terracotta),
                 ),
-              ),
+              ],
+            ),
+          ),
+        ),
+        for (final label in selected)
+          Container(
+            padding: const EdgeInsets.only(left: 14, right: 8, top: 9, bottom: 9),
+            decoration: BoxDecoration(
+              color: label.isNegative ? Tone.error : Tone.ink,
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  '#${label.slug}',
+                  style: GoogleFonts.fraunces(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white),
+                ),
+                const SizedBox(width: 4),
+                GestureDetector(
+                  onTap: () => setState(() => _selectedTagSlugs.remove(label.slug)),
+                  child: const Padding(
+                    padding: EdgeInsets.all(2),
+                    child: Icon(Icons.close, size: 14, color: Colors.white),
+                  ),
+                ),
+              ],
             ),
           ),
       ],
     );
   }
 
-  // Don't see the tag you want? Propose it — moderated, so it isn't usable (by
-  // anyone, including whoever asked) until an admin approves it. Mirrors the
-  // "Can't find it? Add it by hand" affordance above for places.
-  Widget _buildLabelRequest() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: _TextField(controller: _labelRequestController, hint: 'Suggest a new tag'),
-            ),
-            const SizedBox(width: 8),
-            GestureDetector(
-              onTap: _requestingLabel ? null : _requestLabel,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
-                decoration: BoxDecoration(
-                  color: Tone.field,
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: _requestingLabel
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Tone.muted),
-                      )
-                    : Text(
-                        'Suggest',
-                        style: GoogleFonts.fraunces(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: Tone.terracotta,
-                        ),
-                      ),
-              ),
-            ),
-          ],
-        ),
-        if (_labelRequestNotice != null) ...[
-          const SizedBox(height: 8),
-          Text(
-            _labelRequestNotice!,
-            style: GoogleFonts.fraunces(
-              fontSize: 12.5,
-              fontWeight: FontWeight.w500,
-              color: Tone.muted,
-            ),
-          ),
-        ],
-      ],
-    );
-  }
 
   Widget _buildError() {
     return Container(
