@@ -349,12 +349,15 @@ sourced from whatever tags are actually on the loaded list. `add_spot_sheet.dart
 type picker is a tag picker (`GET /labels`) plus an inline "suggest a new tag" field
 (`POST /labels`). No admin UI — see "Labels & moderation" above.
 
-**Flutter — auth built 2026-08-06.** Every request now carries a Firebase ID token
-(`api_service.dart`'s `_headers()`), including a guest's anonymous one, with a single
-401-triggered refresh-and-retry. `AuthController` drives boot (anonymous sign-in →
-`GET /me`), sign-up/sign-in (`LoginPage`, linking the guest session), the handle picker
-(`ChooseHandlePage`), and the Profile tab's guest-vs-account view. No Google Sign-In
-button yet — Phase 4 in auth-plan.md.
+**Flutter — auth built 2026-08-06, expanded 2026-08-23.** Every request now carries a
+Firebase ID token (`api_service.dart`'s `_headers()`), including a guest's anonymous
+one, with a single 401-triggered refresh-and-retry. `AuthController` drives boot
+(anonymous sign-in → `GET /me`), sign-up/sign-in (`LoginPage`, linking the guest
+session), email verification (`VerifyEmailPage`, `AuthPhase.needsEmailVerification` —
+password accounts only, gates handle selection), the handle picker
+(`ChooseHandlePage`), and the Profile tab's guest-vs-account view. `LoginPage` now has
+a "Continue with Google" button (Phase 4 in auth-plan.md) — Google accounts arrive
+pre-verified and skip straight past the verification step.
 
 **Flutter — done.** `lib/models/spot.dart` replaced the old flat `StudySpot`, and
 `api_service.dart` was rewritten: the `Uri.https('localhost:5001', …)` call (https

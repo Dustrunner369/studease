@@ -19,6 +19,12 @@ in [README.md](README.md). See [data-model.md](data-model.md) for the `users` ta
 > **Refined 2026-08-23:** the "authenticated, unregistered" state in the table below is
 > now modeled explicitly on the client as `AuthPhase.needsRegistration`, not just
 > inferred at the `LoginPage` push site — see [Client state](#client-state-refined-2026-08-23).
+>
+> **Built (2026-08-23): email verification and Google Sign-In.** A password-provider
+> account must click its emailed link before choosing a handle — see
+> [Email verification](#email-verification-built-2026-08-23). `LoginPage` also gained a
+> "Continue with Google" button — see the updated Phase 4 below. Password reset and
+> Phase 5 hardening are still open.
 
 ## Where we are today
 
@@ -125,6 +131,48 @@ both entry points — pushed (pop back to `LoginPage`) or booted straight into (
 to pop; the `ListenableBuilder` swaps the screen out on its own once
 `completeRegistration()` flips `phase` to `ready`) — by popping only
 `if (Navigator.of(context).canPop())`.
+
+### Email verification (built 2026-08-23)
+
+An addition to Decision A2: a password-provider identity must click the link Firebase
+emails it before it's allowed to pick a handle. Modeled the same way as the middle row
+above — a fifth, explicit `AuthPhase.needsEmailVerification` (not something inferred
+locally in `LoginPage`), so both the pushed-after-sign-up case and the boot-time case
+(app reopened before verifying) land on the same `VerifyEmailPage`. Only fires for the
+`password` provider — a future Google Sign-In identity comes back `emailVerified: true`
+already and is unaffected.
+
+`AuthController.signUpWithEmail` sends the verification email and sets the phase
+directly, instead of calling `refreshMe()` right away; `bootstrap()` checks
+`emailVerified` before calling `GET /me` at all, so a cached unverified session doesn't
+skip ahead to `ChooseHandlePage`. `VerifyEmailPage` polls Firebase every 5s in the
+background (`user.reload()` + `emailVerified`) so clicking the link is normally enough
+on its own, plus a manual check button, a resend action, and a "sign out and start
+over" escape hatch — mirroring why `ChooseHandlePage` uses `PopScope(canPop: false)`,
+there's nowhere sensible for a back-press to land once a real credential exists.
+
+**Client-side only, deliberately.** `POST /me` does not check the token's
+`email_verified` claim — this closes the UI path, not the raw-API path. Same tradeoff
+as descoping `GET /users/handle-available`: ship the behavior that matters now, revisit
+if it proves necessary. Worth folding into Phase 5 hardening if it ever is.
+
+**Bug, found and fixed same day: `GET /me` succeeding does not mean registered.**
+The first cut of `completeEmailVerification()` set `phase = AuthPhase.ready` on any
+non-throwing `fetchMe()`. But a guest linking a credential always gets a `200` back —
+the guest's row (`isGuest: true`, handle `guest_xxxxxxxx`) already existed before
+sign-up — so verifying email silently skipped `ChooseHandlePage` forever and left the
+account permanently `isGuest: true` with no way back to the handle picker from the UI
+(Profile's guest prompt only offered sign-up/sign-in, both dead ends for an
+already-linked identity: sign-up hits `email-already-in-use`, sign-in just re-fetches
+the same guest row). Fixed by branching on `me!.isGuest`, not on whether the fetch
+threw — `needsRegistration` is for *no row at all* (a real 404); "still a guest" is a
+different, more common condition, signaled by the row's own field. The identical bug
+shipped in `signInWithGoogle()` at the same time, for the same reason, and got the
+same fix. `ProfilePage` also gained a third branch — `_FinishSetupPrompt`, shown when
+`me.isGuest` but the Firebase user is already non-anonymous — as a permanent escape
+hatch for any account that ends up in this state again (app killed between verifying
+and picking a handle, for instance), since that combination can never self-resolve via
+sign-up or sign-in.
 
 ## Guest mode (built 2026-08-06)
 
@@ -589,14 +637,23 @@ too — see [Guest mode](#guest-mode-built-2026-08-06). **Expanded 2026-08-23**:
 "authenticated, unregistered" state is now its own `AuthPhase.needsRegistration`
 instead of falling into `error` — see [Client state](#client-state-refined-2026-08-23).
 
-**Phase 4 — Google Sign-In.** Native config (Xcode target, URL scheme, Android SHA-1s,
-bundle ID) is already done as of 2026-08-06; `google_sign_in` is already a dependency.
-What's left: the actual provider call and button — `google_sign_in` 7.x's
-`initialize()`/`authenticate()`, not the old `signIn()` — and deciding whether it also
-links from a guest session the same way email/password sign-up does. Password reset is
-also still open; the onboarding screen, Profile tab, and sign out landed early, in
-Phase 3, as part of guest mode. *Done when Google sign-in works on a real Android device
-and a real iPhone — the simulator hides SHA-1 and URL-scheme problems.*
+**Phase 4 — Google Sign-In. Provider call built 2026-08-23.** `GoogleSignIn.instance`
+is initialized once at startup in `main()` and awaited before `runApp`, per the 7.x
+contract ("initialize exactly once, wait for it, before any other call"). `LoginPage`
+gained a "Continue with Google" button calling `AuthController.signInWithGoogle()`,
+which mirrors `signUpWithEmail`'s guest-linking (`linkWithCredential` from an anonymous
+session, `signInWithCredential` otherwise) — **yes, it links from a guest session**,
+answering the question this section used to leave open. Google accounts arrive
+pre-verified (`emailVerified: true` already), so this path skips
+`AuthPhase.needsEmailVerification` entirely and goes straight to `refreshMe()`.
+`account-exists-with-different-credential` (see "Account collision" below) is caught
+in `LoginPage` with the same explanatory message the email-collision case uses.
+**Not verified end-to-end on a real device this pass** — native config (Xcode target,
+URL scheme, Android SHA-1s, bundle ID) was already in place as of 2026-08-06 per this
+doc, but that's a Firebase-console setting no amount of reading the repo can confirm.
+*Confirm before shipping: Google sign-in must be exercised on a real Android device and
+a real iPhone — the simulator hides SHA-1 and URL-scheme problems.* Password reset is
+still open.
 
 **Phase 5 — harden.** Bypass off in every non-development configuration, rate limits,
 `DELETE /me`, production CORS origins, and the dev-user data decision above.

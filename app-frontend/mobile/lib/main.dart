@@ -6,7 +6,9 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:mobile/firebase_options.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:mobile/features/authentication/presentation/choose_handle_page.dart';
+import 'package:mobile/features/authentication/presentation/verify_email_page.dart';
 import 'package:mobile/features/profile/presentation/profile_page.dart';
 import 'package:mobile/features/study_spots/presentation/add_spot_sheet.dart';
 import 'package:mobile/services/auth_controller.dart';
@@ -23,6 +25,9 @@ Future<void> main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+  // Must complete before any other GoogleSignIn.instance call — done once, here, so
+  // LoginPage's Google button never has to think about it.
+  await GoogleSignIn.instance.initialize();
 
   final auth = AuthController();
   unawaited(auth.bootstrap());
@@ -56,6 +61,7 @@ class StudySpotApp extends StatelessWidget {
           AuthPhase.loading => const _BootSplash(),
           AuthPhase.error => _BootError(auth: auth),
           AuthPhase.needsRegistration => ChooseHandlePage(auth: auth),
+          AuthPhase.needsEmailVerification => VerifyEmailPage(auth: auth),
           AuthPhase.ready => SpotsPage(auth: auth),
         },
       ),

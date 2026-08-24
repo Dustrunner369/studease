@@ -195,3 +195,24 @@ class CafeShelfSketch extends StatelessWidget {
     );
   }
 }
+
+/// A puzzled cat — the one non-coffee sketch, reserved for "you're not signed in
+/// yet" on the Profile tab rather than the empty/loading states the coffee sketches
+/// cover.
+class ConfusedCatSketch extends StatelessWidget {
+  final double size;
+  final Color color;
+
+  const ConfusedCatSketch({super.key, this.size = 120, this.color = Tone.ink});
+
+  @override
+  Widget build(BuildContext context) {
+    // Source art is 1500x2211.
+    return _AssetSketch(
+      asset: 'assets/illustrations/confusedCat.png',
+      width: size,
+      height: size * 2211 / 1500,
+      color: color,
+    );
+  }
+}
