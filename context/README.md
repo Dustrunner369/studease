@@ -8,7 +8,9 @@ specs, not generated output: when the code and these docs disagree, one of them 
 | [data-model.md](data-model.md) | Entities, relationships, invariants, build order, migration off today's schema |
 | [schema.sql](schema.sql) | Postgres DDL for the target model (reference — EF migrations stay the source of truth) |
 | [api-contracts.md](api-contracts.md) | JSON shapes on the wire, shared by the .NET API, Flutter app, and Angular web app |
-| [auth-plan.md](auth-plan.md) | Sign-in and registration — Firebase Auth with email/password + Google, endpoints, client work, build order (**decided, not built**) |
+| [auth-plan.md](auth-plan.md) | Sign-in and registration — Firebase Auth with email/password + Google, endpoints, client work, build order (**decided, mostly built**) |
+| [mobile-app.md](mobile-app.md) | The Flutter app's structure, design system, illustrations, and client-only behavior that doesn't cross the wire |
+| [infra.md](infra.md) | Hosting (Neon), local dev, environment variables, connection-string plumbing |
 
 ## The shape of the app, in one paragraph
 
@@ -33,6 +35,7 @@ from the Places API when a spot is rendered.
 | D8 | Hours pulled live from Places, never stored | No `hours` column anywhere; `openUntil` is a response field, not a database field |
 | D9 | Manual entry is allowed alongside Places | `google_place_id` is **nullable** with a unique index only where present; `latitude`/`longitude` are nullable too |
 | D10 | `spots.type` replaced by a standardized, moderated tag system (2026-08-06) | `labels` + `spot_entry_tags` + `spot_tag_counts`; tags are per-entry (like `group_study`), aggregated onto the spot; new labels need `users.is_admin` approval before they're usable |
+| D11 | Labels carry a positive/negative polarity, set by the admin at approval, not the requester (2026-08-17) | `labels.polarity`, nullable, `CHECK` restricted to `positive`/`negative`; `POST /admin/labels/{id}/approve` now requires it in the body |
 
 ### Why D9 exists
 
@@ -62,21 +65,38 @@ whole point — an unmoderated free-text field gives you `#cozy`, `#Cozy`, and
 `#cozyvibes` as three different tags, which defeats filtering and recommending just as
 completely as no tags at all.
 
+### Why D11 exists
+
+A tag reads as either a compliment or a complaint — "Cozy" vs "Too loud" — and letting
+the requester pick which is a hole in the same moderation story D10 just closed:
+nothing stops someone submitting a negative-sounding tag labeled positive, or the
+reverse. Moving that call to whoever approves the request (`POST
+/admin/labels/{id}/approve` now takes `polarity` as a required argument) keeps it
+consistent with the rest of the standardization story instead of trusting the
+requester's own framing.
+
 ## What's built
 
-v1 is in. `users`, `spots`, and `spot_entries` exist, with the add-spot and
-delete-my-rating flows working end to end. Auth (see "Still open" #1) and the
-`labels`/tag system (D10) are also built.
+v1 is in. `users`, `spots`, and `spot_entries` exist, with the add-spot, edit-spot
+(`PUT /spots/{id}`, 2026-08-07), and delete-my-rating flows working end to end. Auth
+(see "Still open" #1) and the `labels`/tag system (D10, plus polarity D11) are also
+built. Postgres itself has been hosted on Neon since 2026-08-20 — see
+[infra.md](infra.md).
 
 `follows`, `photos`, and `activity_events` are designed in this folder but **not built**
 — they're v2/v3 in the build order below. [schema.sql](schema.sql) marks which is which.
+
+**Client-only, not on the wire at all**: fuzzy search on the Spots tab and the
+detail sheet's directions button are pure Flutter behavior with no server endpoint
+behind them — see [mobile-app.md](mobile-app.md).
 
 **Deferred fast-follows on the tag system, tracked here so they aren't silently
 dropped**: an admin UI in the Flutter app (moderation is curl-only today, see
 [api-contracts.md](api-contracts.md)), a spot-wide tag-cloud in the detail sheet (the
 sheet shows my-own tags only), a server-side filter-by-tag endpoint (filtering is
-100% client-side today, same as the old `type` filter was), and a way to reopen a
-`rejected` label slug (currently a manual DB edit).
+100% client-side today, same as the old `type` filter was), a way to reopen a
+`rejected` label slug (currently a manual DB edit), and any client-side use of a
+label's `polarity` (D11) — the picker and filter chips don't distinguish it yet.
 
 ## Still open
 
@@ -91,9 +111,13 @@ These block specific pieces of work, not the schema as a whole:
    signs in. Also built, ahead of the original plan: **guest mode** — the app starts an
    anonymous Firebase session automatically so nobody sees a sign-in wall, capped at 3
    spot entries, upgraded to a real account in place (same uid, same spots) via
-   `POST /me`. Still unbuilt: Google Sign-In (Phase 4 — the native config is already
-   wired, just not the Dart button), rate limiting and the bypass-off hardening
-   (Phase 5).
+   `POST /me`. **Refined 2026-08-23**: a real (non-guest) identity that reaches boot
+   with a valid token but no `users` row — e.g. a cached session outliving a database
+   reset — now gets its own `AuthPhase.needsRegistration` instead of a generic error
+   screen; see [mobile-app.md](mobile-app.md). Still unbuilt: Google Sign-In (Phase 4
+   — `google_sign_in` is a dependency and the native config is wired, but there's no
+   `initialize()`/`authenticate()` call or button in the Dart code yet), rate limiting
+   and the bypass-off hardening (Phase 5).
 2. **Photo storage** — blocks the `photos` table being useful. Recommendation: S3-compatible
    object storage (R2, Supabase Storage) with `storage_key` in Postgres and the URL derived
    at read time. A local Docker volume works for development.
@@ -118,4 +142,6 @@ ALTER TABLE "__EFMigrationsHistory" RENAME COLUMN "ProductVersion" TO product_ve
 
 **The local `appdb` still has the old `StudySpots` table** and will hit exactly this on
 the next `dotnet ef database update`. Nothing has touched it — the new schema was
-verified on a separate throwaway database instead.
+verified on a separate throwaway database instead. **Predates Neon hosting
+(2026-08-20, see [infra.md](infra.md))** — whether the Neon project started from a
+clean schema or inherited this same state hasn't been checked.

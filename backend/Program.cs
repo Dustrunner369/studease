@@ -168,10 +168,20 @@ api.MapGet("/places/search", async (string? q, PlacesClient places, Cancellation
 
 // The client's boot call. 200 with the caller's account - guests included, they're
 // auto-provisioned by CurrentUser - or 404 if a real identity hasn't registered yet.
+// Same registration-required problem type as RequireRegisteredFilter (just a 404 here
+// instead of a 403 - "your own profile" 404s rather than forbids) so the client's
+// single ApiException.needsRegistration check covers both.
 api.MapGet("/me", async (CurrentUser currentUser, AppDbContext db, CancellationToken ct) =>
 {
     var user = await currentUser.GetAsync(ct);
-    if (user is null) return Results.NotFound();
+    if (user is null)
+    {
+        return Results.Problem(
+            type: RequireRegisteredFilter.RegistrationRequiredType,
+            title: "Registration required",
+            detail: "This identity is authenticated but has not completed registration. POST /me first.",
+            statusCode: StatusCodes.Status404NotFound);
+    }
 
     var entryCount = await db.SpotEntries.CountAsync(e => e.UserId == user.Id, ct);
 
@@ -662,7 +672,10 @@ static Dictionary<string, string[]> ValidateRatings(RatingsDto? ratings)
 
     void Check(string name, short value)
     {
-        if (value is < 1 or > 5) errors[$"ratings.{name}"] = [$"{name} must be between 1 and 5."];
+        if (value is < 1 or > 5)
+        {
+            errors[$"ratings.{name}"] = [$"{name} must be between 1 and 5."];
+        }
     }
 
     Check("wifi", ratings.Wifi);

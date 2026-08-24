@@ -174,7 +174,8 @@ D10, 2026-08-06). Modeled on Beli's Labels.
   "id": "018f...",
   "slug": "bestforreading",
   "displayName": "Best for reading",
-  "status": "approved"
+  "status": "approved",
+  "polarity": "positive"
 }
 ```
 
@@ -188,6 +189,12 @@ the way `#best-for-reading` reads as broken on every platform that has hashtags.
 label starts `pending` and needs an admin to approve it — see "Labels & moderation"
 below. There is no notification when that happens; the requester finds out by checking
 `GET /labels` later, same as anyone else.
+
+`polarity` is `positive | negative`, **`null` until approved** (decision D11,
+2026-08-17) — a compliment-vs-complaint read on the tag ("Cozy" vs "Too loud") that
+the requester never picks; whoever approves the request sets it. `POST /labels` takes
+no `polarity` field at all. Not yet rendered anywhere in a client — the tag picker
+and filter chips treat every approved label the same regardless of polarity today.
 
 ### `ActivityItem`
 
@@ -215,8 +222,9 @@ below. There is no notification when that happens; the requester finds out by ch
 | --- | --- | --- |
 | `GET` | `/places/search?q=` | Proxies Places Autocomplete. Returns `{ googlePlaceId, name, address }[]`. Proxied so the API key never ships in a client. Pass a session token per search. |
 | `POST` | `/spots` | Body `{ "googlePlaceId": "..." }`. **Idempotent**: `201` with the new spot, or `200` with the existing one if that Place ID is already known. Never creates a duplicate. |
+| `PUT` | `/spots/{id}` | **Built 2026-08-07.** Body `{ "name": "...", "address": "..." }`. Corrects the shared place record's own name/address — most often filling in an address a manually-entered spot never had. Never touches `googlePlaceId`, `latitude`, or `longitude`; those only ever come from a Places lookup, which this doesn't re-run. `address` may be cleared to `null`; `name` may not be blank. Backs the Flutter edit-spot flow — see [mobile-app.md](mobile-app.md). |
 | `GET` | `/spots/{id}` | Full `Spot`, including live hours and the caller's own entry as `myEntry`. |
-| `GET` | `/spots/{id}/entries` | Other users' entries for this spot, respecting visibility. Paginated. |
+| `GET` | `/spots/{id}/entries` | **Not built.** Other users' entries for this spot, respecting visibility. Paginated. Blocked on `follows`/visibility being real (v2) — today `SpotDetailDto.MyEntry` is the only per-user entry data a client can see. |
 
 `POST /spots` takes **either** `{ "googlePlaceId": "..." }` — the normal path — **or**
 `{ "name": "...", "address": "..." }` for a place Google doesn't know about (decision
@@ -279,7 +287,7 @@ yet (`registration-required`) is also a `403` and means something different. See
 
 | Method | Path | Notes |
 | --- | --- | --- |
-| `GET` | `/me` | The caller's `Me` — `200` always for a guest (auto-provisioned), or a real identity that has registered. `404` if authenticated but genuinely unregistered (shouldn't happen via this app's own client, which is always anonymous-then-linked; kept for a future direct sign-up path). |
+| `GET` | `/me` | The caller's `Me` — `200` always for a guest (auto-provisioned), or a real identity that has registered. `404` if authenticated but genuinely unregistered, with the **same** `problems/registration-required` problem `type` as the `403` a `RequireRegisteredFilter`-protected endpoint returns for the identical condition (just a `404` here — "your own profile" 404s rather than forbids). One `ApiException.needsRegistration` check on the client covers both; see [mobile-app.md](mobile-app.md) for how the Flutter boot flow uses it. |
 | `POST` | `/me` | Body `{ "handle": "matt", "displayName": "Matthew" }`. Completes registration — for a brand-new identity, or a guest upgrading in place. `201` (new row) or `200` (guest upgraded), `409` if the handle is taken or this identity already has a real account, `422` if the handle fails `^[a-z0-9_]{3,30}$` or is reserved (`me`, `admin`, `api`, `spots`, `places`, `feed`, `users`, `photos`, `support`, `help`, `settings`, `about`). |
 
 **Not built:** `GET /users/handle-available` (client validates the pattern locally and
@@ -294,7 +302,7 @@ just handles the `409` from `POST /me`), `PATCH /me`, `DELETE /me`.
 | `GET` | `/labels` | `Label[]`, `status: "approved"` only, ordered by slug. The tag picker's data source. |
 | `POST` | `/labels` | Body `{ "name": "..." }`. Idempotent-ish: dedupes to an existing `approved` or `pending` label by slug (`200`, no duplicate created) rather than erroring; a slug matching a `rejected` label is `409`; a new slug is `201` with `status: "pending"`. `400` if the name normalizes to fewer than 2 alphanumeric characters. |
 | `GET` | `/admin/labels/pending` | `PendingLabelDto[]` — `{ id, slug, displayName, requestedBy, createdAt }`. **Admin only.** |
-| `POST` | `/admin/labels/{id}/approve` | Flips `status` to `approved`. **Admin only.** |
+| `POST` | `/admin/labels/{id}/approve` | Body `{ "polarity": "positive" }` (or `"negative"`) — **required**, `400` (`Results.ValidationProblem`) if missing or not one of those two values. Flips `status` to `approved` and sets `polarity`. **Admin only.** |
 | `POST` | `/admin/labels/{id}/reject` | Flips `status` to `rejected` — permanent, no "reconsider" endpoint. **Admin only.** |
 
 "Admin only" means `users.is_admin = true`; a non-admin caller gets `403`. There is
@@ -321,6 +329,18 @@ which checks the resolved `User.IsAdmin`.
 | `DELETE` | `/photos/{id}` | Soft delete; uploader or spot owner only. |
 
 ## Client status
+
+See [mobile-app.md](mobile-app.md) for the Flutter app's structure, design system, and
+client-only behavior (fuzzy search, directions, edit) that never crosses the wire and so
+doesn't belong in this file.
+
+**Flutter — registration gap closed 2026-08-23.** `AuthController` gained a fourth
+`AuthPhase`, `needsRegistration`, for when `GET /me` at boot returns the
+`registration-required` `404` above — a real, non-anonymous identity with a valid token
+but no `users` row (for example, a cached Firebase session that outlived a database
+reset). Previously this fell into the generic `error` phase; now `StudySpotApp` routes
+straight to `ChooseHandlePage` as the root screen, the same screen the ordinary
+guest-links-a-credential flow pushes. See [mobile-app.md](mobile-app.md).
 
 **Flutter — tags built 2026-08-06.** `SpotType` is gone from `theme.dart`; `main.dart`'s
 category circle is one fixed neutral icon now (spots no longer have a single category

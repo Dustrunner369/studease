@@ -192,6 +192,13 @@ CREATE TABLE labels (
     -- picker, or as a tagSlugs value on PUT .../entry.
     status        text        NOT NULL DEFAULT 'pending',
 
+    -- Null until approved. A tag reads as either a compliment or a complaint
+    -- ("Cozy" vs "Too loud") — the requester never picks this (see
+    -- RequestLabelRequest), it's decided by whoever approves the request
+    -- (decision D11, 2026-08-17), which stops a requester sneaking a
+    -- negative-sounding tag in as positive or vice versa.
+    polarity      text,
+
     requested_by  uuid        REFERENCES users (id) ON DELETE SET NULL,
     -- Set on rejection too, not only approval — "who reviewed this".
     approved_by   uuid        REFERENCES users (id) ON DELETE SET NULL,
@@ -199,8 +206,9 @@ CREATE TABLE labels (
     created_at    timestamptz NOT NULL DEFAULT now(),
     updated_at    timestamptz NOT NULL DEFAULT now(),
 
-    CONSTRAINT labels_slug_format  CHECK (slug ~ '^[a-z0-9]{2,30}$'),
-    CONSTRAINT labels_status_valid CHECK (status IN ('pending', 'approved', 'rejected'))
+    CONSTRAINT labels_slug_format    CHECK (slug ~ '^[a-z0-9]{2,30}$'),
+    CONSTRAINT labels_status_valid   CHECK (status IN ('pending', 'approved', 'rejected')),
+    CONSTRAINT labels_polarity_valid CHECK (polarity IN ('positive', 'negative'))
 );
 
 -- A rejected slug is permanently blocked from being re-requested — no "reconsider"

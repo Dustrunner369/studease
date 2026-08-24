@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:mobile/design/illustrations.dart';
 import 'package:mobile/design/theme.dart';
 import 'package:mobile/features/authentication/presentation/choose_handle_page.dart';
+import 'package:mobile/services/api_service.dart';
 import 'package:mobile/services/auth_controller.dart';
 
 enum _Mode { signUp, signIn }
@@ -98,7 +99,19 @@ class _LoginPageState extends State<LoginPage> {
         _submitting = false;
         _error = _messageFor(e);
       });
-    } catch (_) {
+    } catch (e) {
+      if (e is ApiException && e.needsRegistration) {
+        // A stray direct sign-up (see class doc) — a real Firebase identity with no
+        // `users` row. Same recovery as the ordinary guest-upgrade path just above.
+        if (!mounted) return;
+        await Navigator.of(context).push(MaterialPageRoute(
+          builder: (_) => ChooseHandlePage(auth: widget.auth),
+        ));
+        if (!mounted) return;
+        Navigator.of(context).popUntil((route) => route.isFirst);
+        return;
+      }
+
       if (!mounted) return;
       setState(() {
         _submitting = false;

@@ -6,11 +6,13 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:mobile/firebase_options.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:mobile/features/authentication/presentation/choose_handle_page.dart';
 import 'package:mobile/features/profile/presentation/profile_page.dart';
 import 'package:mobile/features/study_spots/presentation/add_spot_sheet.dart';
 import 'package:mobile/services/auth_controller.dart';
 import 'package:mobile/services/api_service.dart';
 import 'package:mobile/models/spot.dart';
+import 'package:mobile/design/illustrations.dart';
 import 'package:mobile/design/motion_widgets.dart';
 import 'package:mobile/design/theme.dart';
 import 'package:fuzzy/fuzzy.dart';
@@ -53,6 +55,7 @@ class StudySpotApp extends StatelessWidget {
         builder: (context, _) => switch (auth.phase) {
           AuthPhase.loading => const _BootSplash(),
           AuthPhase.error => _BootError(auth: auth),
+          AuthPhase.needsRegistration => ChooseHandlePage(auth: auth),
           AuthPhase.ready => SpotsPage(auth: auth),
         },
       ),
@@ -71,6 +74,8 @@ class _BootSplash extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            const CafeShelfSketch(size: 172),
+            const SizedBox(height: Space.md),
             // The one wordmark moment in the app right now — outlier typeface,
             // used nowhere else. Placeholder script until a purchased font
             // replaces it; see AppText.wordmark.
@@ -445,6 +450,12 @@ class _SpotsPageState extends State<SpotsPage> {
           child: Center(
             child: Column(
               children: [
+                // Only for the true empty state — a filtered-to-nothing search still
+                // has spots, so the "start here" art would be misleading.
+                if (_filterTags.isEmpty) ...[
+                  const CoffeeOnBooksSketch(size: 96, color: Tone.muted),
+                  const SizedBox(height: Space.md),
+                ],
                 Text(
                   _filterTags.isEmpty
                       ? 'No spots yet — tap + to add one'

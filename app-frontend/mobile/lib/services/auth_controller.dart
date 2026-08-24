@@ -3,7 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:mobile/models/me.dart';
 import 'package:mobile/services/api_service.dart';
 
-enum AuthPhase { loading, ready, error }
+enum AuthPhase { loading, ready, needsRegistration, error }
 
 class AuthController extends ChangeNotifier {
   AuthPhase phase = AuthPhase.loading;
@@ -22,8 +22,17 @@ class AuthController extends ChangeNotifier {
       me = await fetchMe();
       phase = AuthPhase.ready;
     } catch (e) {
-      error = e;
-      phase = AuthPhase.error;
+      if (e is ApiException && e.needsRegistration) {
+        // A real, non-anonymous identity with a valid token but no `users` row —
+        // most often a Firebase session that outlived its account (e.g. cached
+        // on-device across a database reset). ChooseHandlePage recovers this the
+        // same way it handles an ordinary guest-just-linked-a-credential: pick a
+        // handle to finish.
+        phase = AuthPhase.needsRegistration;
+      } else {
+        error = e;
+        phase = AuthPhase.error;
+      }
     }
 
     notifyListeners();
@@ -38,6 +47,7 @@ class AuthController extends ChangeNotifier {
   // Allows user to input a custom handle
   Future<void> completeRegistration({required String handle, required String displayName}) async {
     me = await registerMe(handle: handle, displayName: displayName);
+    phase = AuthPhase.ready;
     notifyListeners();
   }
 

@@ -61,6 +61,7 @@ erDiagram
         text slug UK
         text display_name
         text status
+        text polarity "nullable until approved"
         uuid requested_by FK
         uuid approved_by FK
     }
@@ -133,6 +134,9 @@ One row per real-world place. **Globally shared** — not owned by whoever added
 - `name`, `formatted_address`, `latitude`, `longitude`, `price_level`, `website_url`,
   `phone` are all snapshots from Places, refreshed on a schedule; `places_synced_at`
   records when. They're stored so lists render without an API call per row.
+- `utc_offset_minutes` is also a Places snapshot, but it isn't rendered anywhere —
+  it exists so the API can work out the spot's *local* "now" when deciding what time
+  it closes today. Null for manual spots, same as the other Places-sourced fields.
 - **No hours column** (D8). Hours are fetched live from Places when a single spot is
   rendered. See "Places data and caching" below.
 - **No `type` column** (removed 2026-08-06, decision D10). Spots used to carry a
@@ -206,6 +210,13 @@ proposed it — until an admin reviews it.
 - `status` is `pending | approved | rejected`. Only `approved` labels appear in the
   picker or validate on a `PUT .../entry` write. A request that dedupes to an existing
   `pending` or `approved` label returns that row rather than creating a duplicate.
+- `polarity` is `positive | negative`, **null until approved** (decision D11,
+  2026-08-17). A tag reads as either a compliment or a complaint — "Cozy" vs "Too
+  loud" — and the requester never picks which: `POST /labels` takes only a name,
+  and polarity is set by whoever approves the request (`POST
+  /admin/labels/{id}/approve`, which now requires it in the body). That keeps a
+  requester from sneaking a negative-sounding tag in as positive, or the reverse.
+  Not yet surfaced anywhere in a client UI — see api-contracts.md.
 - `requested_by` / `approved_by` are nullable FKs to `users`, `SET NULL` on delete —
   provenance, not ownership. `approved_by` is set on rejection too ("who reviewed
   this"), not only on approval.

@@ -5,9 +5,11 @@ import 'package:mobile/design/theme.dart';
 import 'package:mobile/services/api_service.dart';
 import 'package:mobile/services/auth_controller.dart';
 
-/// Shown exactly once per account: right after a guest links a real credential, before
-/// they've ever picked a handle. POST /me is what actually flips IsGuest server-side —
-/// until this completes, the account is still capped like a guest.
+/// Shown once per account, in two situations: pushed right after a guest links a real
+/// credential, or as the app's root screen when AuthController.bootstrap() finds a
+/// real, non-anonymous identity with no `users` row yet (ApiException.needsRegistration
+/// — see AuthPhase.needsRegistration). POST /me is what actually flips IsGuest
+/// server-side — until this completes, the account is still capped like a guest.
 class ChooseHandlePage extends StatefulWidget {
   final AuthController auth;
 
@@ -53,7 +55,11 @@ class _ChooseHandlePageState extends State<ChooseHandlePage> {
     try {
       await widget.auth.completeRegistration(handle: handle, displayName: displayName);
       if (!mounted) return;
-      Navigator.of(context).pop();
+      // Pushed from LoginPage: pop back to it. Booted straight into this page instead
+      // (AuthPhase.needsRegistration): nothing to pop — completeRegistration already
+      // flipped the phase to ready, and StudySpotApp's ListenableBuilder swaps the
+      // screen out from under us on its own.
+      if (Navigator.of(context).canPop()) Navigator.of(context).pop();
     } on ApiException catch (e) {
       if (!mounted) return;
       setState(() {

@@ -1,16 +1,40 @@
-/// Hand-built placeholder illustrations in the loose, sketchy-ink style from the
-/// brand references — a moka pot, a coffee cup. These are deliberately rough (small
-/// coordinate wobble instead of perfect CAD curves) rather than slick, since a too-
-/// clean line reads as "AI doodle," not "hand drawn."
+/// Hand-drawn illustrations for the "cozy coffee shop" brand.
 ///
-/// Placeholders only. Drop real asset files into assets/illustrations/ (registered
-/// in pubspec.yaml) and swap the call sites in main.dart / login_page.dart from
-/// e.g. `MokaPotSketch()` to `Image.asset('assets/illustrations/moka-pot.png')` —
-/// nothing else about the layout needs to change, both are just a `Widget`.
+/// [MokaPotSketch] is still a CustomPaint placeholder (small coordinate wobble
+/// instead of perfect CAD curves, so it doesn't read as "AI doodle") — no moka pot
+/// asset has landed yet. [CoffeeCupSketch], [CoffeeOnBooksSketch], and
+/// [CafeShelfSketch] are backed by real PNGs in assets/illustrations/ (registered
+/// in pubspec.yaml), recolored via [_AssetSketch] so they sit in the app's warm-ink
+/// register instead of the source art's flat black.
 library;
 
 import 'package:flutter/material.dart';
 import 'package:mobile/design/theme.dart';
+
+/// Renders a hand-drawn PNG asset, recolored to [color] via `BlendMode.srcIn` —
+/// the source art is solid black-on-transparent, so this swaps in the brand's
+/// warm ink (or whatever tone the call site needs) instead of flat black.
+class _AssetSketch extends StatelessWidget {
+  final String asset;
+  final double width;
+  final double height;
+  final Color color;
+
+  const _AssetSketch({
+    required this.asset,
+    required this.width,
+    required this.height,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ColorFiltered(
+      colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
+      child: Image.asset(asset, width: width, height: height, fit: BoxFit.contain),
+    );
+  }
+}
 
 class _SketchPainter extends CustomPainter {
   final Color color;
@@ -110,9 +134,9 @@ class MokaPotSketch extends StatelessWidget {
   }
 }
 
-/// A coffee cup on a saucer, side profile with a little steam — echoes the
-/// cup-and-croissant reference. Deliberately simpler than the moka pot: one warm
-/// signature object rather than a whole still-life.
+/// A coffee cup on a saucer with a curl of steam — echoes the cup-and-croissant
+/// reference. Deliberately simpler than the café shelf: one warm signature object
+/// rather than a whole still-life.
 class CoffeeCupSketch extends StatelessWidget {
   final double size;
   final Color color;
@@ -121,67 +145,53 @@ class CoffeeCupSketch extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
+    // Source art is 1500x1670.
+    return _AssetSketch(
+      asset: 'assets/illustrations/coffeeWithSteam.png',
       width: size,
-      height: size * 0.85,
-      child: CustomPaint(
-        painter: _SketchPainter(color: color, draw: _drawCup),
-      ),
+      height: size * 1670 / 1500,
+      color: color,
     );
   }
+}
 
-  static void _drawCup(Canvas canvas, Size size, Paint paint) {
-    final w = size.width, h = size.height;
-    Offset p(double x, double y) => Offset(x * w / 100, y * h / 85);
+/// A steaming mug resting on a stack of books — the "study spot" pairing. Reach
+/// for this where the app has nothing to show yet, rather than the standalone cup.
+class CoffeeOnBooksSketch extends StatelessWidget {
+  final double size;
+  final Color color;
 
-    // Cup body — a soft trapezoid, wider at the rim.
-    final cup = Path()
-      ..moveTo(p(22, 30).dx, p(22, 30).dy)
-      ..quadraticBezierTo(p(20, 58).dx, p(20, 58).dy, p(30, 66).dx, p(30, 66).dy)
-      ..lineTo(p(62, 66).dx, p(62, 66).dy)
-      ..quadraticBezierTo(p(72, 58).dx, p(72, 58).dy, p(70, 30).dx, p(70, 30).dy);
-    canvas.drawPath(cup, paint);
+  const CoffeeOnBooksSketch({super.key, this.size = 100, this.color = Tone.ink});
 
-    // Rim — a flattened ellipse, slightly open so it doesn't read as a perfect oval.
-    final rim = Path()
-      ..moveTo(p(22, 30).dx, p(22, 30).dy)
-      ..quadraticBezierTo(p(46, 22).dx, p(46, 22).dy, p(70, 30).dx, p(70, 30).dy)
-      ..quadraticBezierTo(p(46, 38).dx, p(46, 38).dy, p(22, 30).dx, p(22, 30).dy);
-    canvas.drawPath(rim, paint);
+  @override
+  Widget build(BuildContext context) {
+    // Source art is 1500x2044.
+    return _AssetSketch(
+      asset: 'assets/illustrations/coffeeOnBooks.png',
+      width: size,
+      height: size * 2044 / 1500,
+      color: color,
+    );
+  }
+}
 
-    // Handle — one open loop.
-    final handle = Path()
-      ..moveTo(p(70, 38).dx, p(70, 38).dy)
-      ..cubicTo(
-        p(90, 36).dx, p(90, 36).dy,
-        p(90, 60).dx, p(90, 60).dy,
-        p(68, 58).dx, p(68, 58).dy,
-      );
-    canvas.drawPath(handle, paint);
+/// A café shelf of mugs over a table-and-chairs scene. Busier than the other two —
+/// it's a whole-room still life, not a single object — so it reads best as a full
+/// branding moment (a splash or welcome screen) rather than a small inline accent.
+class CafeShelfSketch extends StatelessWidget {
+  final double size;
+  final Color color;
 
-    // Saucer.
-    final saucer = Path()
-      ..moveTo(p(10, 70).dx, p(10, 70).dy)
-      ..quadraticBezierTo(p(46, 80).dx, p(46, 80).dy, p(84, 70).dx, p(84, 70).dy);
-    canvas.drawPath(saucer, paint);
+  const CafeShelfSketch({super.key, this.size = 160, this.color = Tone.ink});
 
-    // Two lazy steam curls — kept within y >= 0 (there's headroom above the rim at
-    // y=22) since CustomPaint doesn't clip overflow by default.
-    final steam1 = Path()
-      ..moveTo(p(38, 20).dx, p(38, 20).dy)
-      ..cubicTo(
-        p(32, 14).dx, p(32, 14).dy,
-        p(44, 10).dx, p(44, 10).dy,
-        p(38, 2).dx, p(38, 2).dy,
-      );
-    final steam2 = Path()
-      ..moveTo(p(54, 20).dx, p(54, 20).dy)
-      ..cubicTo(
-        p(48, 14).dx, p(48, 14).dy,
-        p(60, 10).dx, p(60, 10).dy,
-        p(54, 2).dx, p(54, 2).dy,
-      );
-    canvas.drawPath(steam1, paint);
-    canvas.drawPath(steam2, paint);
+  @override
+  Widget build(BuildContext context) {
+    // Source art is 1500x1703.
+    return _AssetSketch(
+      asset: 'assets/illustrations/coffeeTable.png',
+      width: size,
+      height: size * 1703 / 1500,
+      color: color,
+    );
   }
 }

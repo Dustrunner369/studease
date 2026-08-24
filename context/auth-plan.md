@@ -15,6 +15,10 @@ in [README.md](README.md). See [data-model.md](data-model.md) for the `users` ta
 > endpoint requires a valid Firebase token, `GET`/`POST /me` exist, and the Flutter app
 > signs in with email/password. Google Sign-In (Phase 4) and hardening (Phase 5) are
 > still open.
+>
+> **Refined 2026-08-23:** the "authenticated, unregistered" state in the table below is
+> now modeled explicitly on the client as `AuthPhase.needsRegistration`, not just
+> inferred at the `LoginPage` push site — see [Client state](#client-state-refined-2026-08-23).
 
 ## Where we are today
 
@@ -101,6 +105,26 @@ So every client is in exactly one of three states:
 
 The middle state is the one that gets forgotten and then causes a blank screen on a fresh
 install. Model it explicitly from the start.
+
+### Client state (refined 2026-08-23)
+
+The middle row above is now a real, named `AuthController` state —
+`AuthPhase.needsRegistration` — not just something `LoginPage` inferred locally. Before
+this, `bootstrap()` treated *any* failure from `GET /me` as `AuthPhase.error`, which
+meant the one client-visible symptom of "valid token, no `users` row" *at boot* (as
+opposed to right after a guest links a credential, which `LoginPage` already handled)
+was a generic error screen instead of the handle picker. That gap is real, not
+hypothetical: a device holding a cached, non-anonymous Firebase session whose backing
+`users` row was deleted — a database reset during development, most concretely — hits
+it on the very next launch.
+
+`main.dart`'s root `ListenableBuilder` now has a fourth branch,
+`AuthPhase.needsRegistration => ChooseHandlePage(auth: auth)`, shown as the app's root
+screen rather than pushed onto a navigator. `ChooseHandlePage.onSave` accounts for
+both entry points — pushed (pop back to `LoginPage`) or booted straight into (nothing
+to pop; the `ListenableBuilder` swaps the screen out on its own once
+`completeRegistration()` flips `phase` to `ready`) — by popping only
+`if (Navigator.of(context).canPop())`.
 
 ## Guest mode (built 2026-08-06)
 
@@ -411,6 +435,14 @@ Drive it with a `ListenableBuilder` at the root — no new dependency, and it's 
 `AuthState`. Leave `go_router` for whenever the Map and Profile tabs become real; adding
 declarative routing and auth in the same change means debugging two new things at once.
 
+**Built as `AuthPhase`, not `AuthState`** — `loading | ready | needsRegistration |
+error` (the last two named differently than this sketch's `unregistered`/`signedOut`,
+and `needsRegistration` added later, see [Client
+state](#client-state-refined-2026-08-23)). The `go_router` deferral turned out to be
+open-ended rather than "until the Map tab": **there is no Map tab in this app** — see
+[mobile-app.md](mobile-app.md) — and Profile shipped as a real screen in this same
+phase, not deferred. `router.dart` is still empty as of 2026-08-23.
+
 ### Attaching the token
 
 `api_service.dart` funnels every call through `_send`, which is lucky — the change is
@@ -435,8 +467,13 @@ that retry inside `_send` so no call site has to think about it.
 `ApiException` grows a companion to `isPlacesUnavailable`:
 
 ```dart
-bool get needsRegistration => statusCode == 403;  // match on the problem `type`, not bare 403
+bool get needsRegistration => problemType == _registrationRequiredType;
 ```
+
+**Built as `problemType`, not a bare status check** — the real implementation matches
+the RFC 9457 `type` string, because `GET /me`'s `404` and `RequireRegisteredFilter`'s
+`403` both carry `registration-required` for the identical condition (see
+[api-contracts.md](api-contracts.md)); a bare status-code check would miss one of them.
 
 ### Screens
 
@@ -548,7 +585,9 @@ auto-provisioning and the 3-entry cap — see [Guest mode](#guest-mode-built-202
 auth gate in `main.dart` (`ListenableBuilder` at the root, per this plan), sign-in/sign-up
 screens, token attachment and 401 retry in `api_service.dart`. **Email/password only**,
 as planned. Went further than "signs in" alone: the app is usable *before* signing in
-too — see [Guest mode](#guest-mode-built-2026-08-06).
+too — see [Guest mode](#guest-mode-built-2026-08-06). **Expanded 2026-08-23**: the
+"authenticated, unregistered" state is now its own `AuthPhase.needsRegistration`
+instead of falling into `error` — see [Client state](#client-state-refined-2026-08-23).
 
 **Phase 4 — Google Sign-In.** Native config (Xcode target, URL scheme, Android SHA-1s,
 bundle ID) is already done as of 2026-08-06; `google_sign_in` is already a dependency.
