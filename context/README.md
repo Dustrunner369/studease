@@ -17,9 +17,11 @@ specs, not generated output: when the code and these docs disagree, one of them 
 Studease is a **social** app. A `spot` is a real-world place, identified by its Google
 Place ID and shared by everyone. A `spot_entry` is **one user's opinion of one spot** —
 five 1–5 ratings, an optional coffee order, optional notes. One entry per user per spot,
-edited in place; there is no visit history. Users follow each other and see an activity
-feed of their friends' entries. Opening hours are **not stored** — they're fetched live
-from the Places API when a spot is rendered.
+edited in place. Separately, a `spot_visit` log lets you say "I'm studying here today" —
+unlimited entries, no rating, optional notes on what you studied and ordered — building a
+personal study history (D12). Users follow each other and see an activity feed of their
+friends' entries. Opening hours are **not stored** — they're fetched live from the
+Places API when a spot is rendered.
 
 ## Decisions already made
 
@@ -36,6 +38,7 @@ from the Places API when a spot is rendered.
 | D9 | Manual entry is allowed alongside Places | `google_place_id` is **nullable** with a unique index only where present; `latitude`/`longitude` are nullable too |
 | D10 | `spots.type` replaced by a standardized, moderated tag system (2026-08-06) | `labels` + `spot_entry_tags` + `spot_tag_counts`; tags are per-entry (like `group_study`), aggregated onto the spot; new labels need `users.is_admin` approval before they're usable |
 | D11 | Labels carry a positive/negative polarity, set by the admin at approval, not the requester (2026-08-17) | `labels.polarity`, nullable, `CHECK` restricted to `positive`/`negative`; `POST /admin/labels/{id}/approve` now requires it in the body |
+| D12 | A separate, append-only `spot_visits` log, layered alongside D2, not replacing it (2026-08-23) | `spot_visits`: many rows per (user, spot), no uniqueness constraint; requires an existing `spot_entries` row to create one |
 
 ### Why D9 exists
 
@@ -50,6 +53,18 @@ Place ID is rejected.
 
 A manual spot has no coordinates — we don't geocode typed addresses — so it won't appear
 on the Map tab until someone links it to a real place.
+
+### Why D12 exists
+
+D2 keeps a `spot_entry` a single, edited-in-place row — that's the right shape for "what
+do I currently think of this place", where a second opinion should overwrite the first,
+not pile up. But "when did I study here" is a different question with a different
+shape: it's inherently many rows per (user, spot), one per occasion, and none of them
+should overwrite another. Rather than stretch `spot_entries` to cover both — which would
+mean giving up the `UNIQUE (user_id, spot_id)` constraint D2 relies on — visits get their
+own table. Requiring an existing rating to log a visit (enforced in the API, not a DB
+constraint — a cross-table CHECK isn't expressible) keeps the two concepts linked without
+merging them: you can't log a visit to somewhere you've never rated.
 
 ### Why D10 exists
 
@@ -80,8 +95,10 @@ requester's own framing.
 v1 is in. `users`, `spots`, and `spot_entries` exist, with the add-spot, edit-spot
 (`PUT /spots/{id}`, 2026-08-07), and delete-my-rating flows working end to end. Auth
 (see "Still open" #1) and the `labels`/tag system (D10, plus polarity D11) are also
-built. Postgres itself has been hosted on Neon since 2026-08-20 — see
-[infra.md](infra.md).
+built. `spot_visits` (D12, 2026-08-23) is built too — log/list-per-spot/list-mine
+endpoints, the Flutter "Log a visit"/"Past visits" buttons on the spot detail sheet, and
+the Profile tab's study history. Postgres itself has been hosted on Neon since
+2026-08-20 — see [infra.md](infra.md).
 
 `follows`, `photos`, and `activity_events` are designed in this folder but **not built**
 — they're v2/v3 in the build order below. [schema.sql](schema.sql) marks which is which.
@@ -114,10 +131,13 @@ These block specific pieces of work, not the schema as a whole:
    `POST /me`. **Refined 2026-08-23**: a real (non-guest) identity that reaches boot
    with a valid token but no `users` row — e.g. a cached session outliving a database
    reset — now gets its own `AuthPhase.needsRegistration` instead of a generic error
-   screen; see [mobile-app.md](mobile-app.md). Still unbuilt: Google Sign-In (Phase 4
-   — `google_sign_in` is a dependency and the native config is wired, but there's no
-   `initialize()`/`authenticate()` call or button in the Dart code yet), rate limiting
-   and the bypass-off hardening (Phase 5).
+   screen; see [mobile-app.md](mobile-app.md). **Also built 2026-08-23**: email
+   verification (a password-provider account must click its emailed link before
+   choosing a handle — `AuthPhase.needsEmailVerification`, `VerifyEmailPage`) and the
+   Google Sign-In provider call (`LoginPage`'s "Continue with Google", links from a
+   guest session the same way email/password sign-up does) — **not yet verified
+   end-to-end on a real device**. Still unbuilt: password reset, rate limiting, and
+   the bypass-off hardening (Phase 5).
 2. **Photo storage** — blocks the `photos` table being useful. Recommendation: S3-compatible
    object storage (R2, Supabase Storage) with `storage_key` in Postgres and the URL derived
    at read time. A local Docker volume works for development.

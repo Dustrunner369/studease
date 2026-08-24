@@ -14,7 +14,7 @@ lib/
                                               detail sheet, CleanBottomNav
   router.dart                                empty, unused — go_router is deferred
                                               until the Map/Profile tabs need it
-  models/                                    spot.dart, me.dart, label.dart
+  models/                                    spot.dart, me.dart, label.dart, visit.dart
   services/
     api_service.dart                         every HTTP call, token attachment, retry
     auth_controller.dart                     AuthController, AuthPhase
@@ -25,7 +25,8 @@ lib/
   features/
     authentication/presentation/             login_page.dart, choose_handle_page.dart
     profile/presentation/                    profile_page.dart
-    study_spots/presentation/                add_spot_sheet.dart, tag_picker_page.dart
+    study_spots/presentation/                add_spot_sheet.dart, tag_picker_page.dart,
+                                              log_visit_sheet.dart, past_visits_sheet.dart
 ```
 
 ## Navigation
@@ -35,25 +36,48 @@ Two real tabs, via `CleanBottomNav` in `main.dart`: **Spots** (`SpotsPage`, inde
 else is a screen pushed on top, or a modal sheet:
 
 - `LoginPage` — sign-in/sign-up, shown for a signed-out or unregistered boot state.
+  Has a "Continue with Google" button (built 2026-08-23) alongside email/password.
+- `VerifyEmailPage` — gates handle selection for a `password`-provider account until
+  its emailed link is clicked. Built 2026-08-23; see "Boot and auth state" below.
 - `ChooseHandlePage` — registration. Reached two ways; see "Boot and auth state" below.
 - `AddSpotSheet` (`showAddSpotSheet`) — modal, dual **add** and **edit** mode (see
   "Client-only features").
 - `TagPickerPage` — modal, opened from `AddSpotSheet`.
 - `SpotDetailSheet` — modal, opened from a row on the Spots tab.
+- `LogVisitSheet` (`showLogVisitSheet`) / `PastVisitsSheet` (`showPastVisitsSheet`) —
+  modals opened from `SpotDetailSheet`'s "Log a visit" / "Past visits" buttons. See
+  [api-contracts.md](api-contracts.md) § Visits (D12).
 
 ## Boot and auth state
 
 `AuthController` (`auth_controller.dart`) exposes `AuthPhase`: `loading`, `ready`,
-`needsRegistration`, `error`. `StudySpotApp`'s root `ListenableBuilder` in `main.dart`
-switches on it directly — there's no separate router for this, `MaterialApp.home` just
-swaps widgets as the phase changes:
+`needsRegistration`, `needsEmailVerification`, `error`. `StudySpotApp`'s root
+`ListenableBuilder` in `main.dart` switches on it directly — there's no separate router
+for this, `MaterialApp.home` just swaps widgets as the phase changes:
 
 | Phase | Screen |
 | --- | --- |
 | `loading` | `_BootSplash` (shows `CafeShelfSketch` above the wordmark) |
 | `error` | `_BootError` |
 | `needsRegistration` | `ChooseHandlePage`, as the **root** screen |
+| `needsEmailVerification` | `VerifyEmailPage`, as the **root** screen |
 | `ready` | `SpotsPage` |
+
+`needsEmailVerification` (**built 2026-08-23**) only fires for the `password`
+provider — a Google identity arrives with `emailVerified: true` already and skips it
+entirely. `bootstrap()` checks `emailVerified` before ever calling `GET /me`, so a
+cached unverified session can't skip ahead to `ChooseHandlePage`. `VerifyEmailPage`
+polls Firebase every 5s (`user.reload()` + `emailVerified`) so clicking the emailed
+link is normally enough on its own, plus a manual check button, a resend action, and a
+sign-out escape hatch. See [auth-plan.md § Email
+verification](auth-plan.md#email-verification-built-2026-08-23) for the full design,
+including a same-day bug fix worth knowing: `GET /me` succeeding does **not** mean
+registered, because a guest linking a credential always gets a `200` back for its
+existing throwaway row — the phase transition out of `needsEmailVerification` branches
+on `me!.isGuest`, not on whether `fetchMe()` throws. `ProfilePage` has a permanent
+`_FinishSetupPrompt` escape hatch for any account that ends up `isGuest: true` with an
+already-non-anonymous Firebase user (e.g. the app was killed between verifying and
+picking a handle) — sign-up and sign-in are both dead ends from that state.
 
 `ChooseHandlePage` is reachable two ways, and it has to behave correctly in both:
 
@@ -182,11 +206,16 @@ same restriction the endpoint itself enforces.
 
 ## Dependencies worth knowing the status of
 
-- **`google_sign_in: ^7.2.0`** is in `pubspec.yaml` but **not yet wired to anything** —
-  no `initialize()`/`authenticate()` call and no button exist in the app yet. This is
-  [auth-plan.md](auth-plan.md) Phase 4, still open. (That package's 7.x line is a
-  breaking rewrite of the old `GoogleSignIn()`/`signIn()` API — read its migration
-  notes before writing the provider call, not after; most tutorials are still 6.x.)
+- **`google_sign_in: ^7.2.0`** — provider call **built 2026-08-23**.
+  `GoogleSignIn.instance.initialize()` runs once in `main()`, awaited before
+  `runApp` (required by the 7.x contract: initialize exactly once, before any other
+  call — a breaking rewrite of the old `GoogleSignIn()`/`signIn()` API, so most
+  tutorials and generated snippets are still 6.x and won't compile). `LoginPage`'s
+  "Continue with Google" calls `AuthController.signInWithGoogle()`, which links from a
+  guest session the same way `signUpWithEmail` does. **Not yet verified end-to-end on
+  a real device** — native config was in place as of 2026-08-06, but nothing in the
+  repo can confirm the Firebase-console side actually works; the simulator hides
+  SHA-1/URL-scheme problems that only show up on a real Android device and iPhone.
 - **`router.dart`** is an empty file. `go_router` is deferred until the Map and Profile
   tabs need declarative routing — see [auth-plan.md](auth-plan.md) § State.
 
@@ -196,3 +225,5 @@ same restriction the endpoint itself enforces.
 - The structural/motion design rebuild hasn't reached every screen — see "Rollout is
   intentionally partial" above.
 - No Map tab exists in this codebase, only Spots and Profile.
+- Google Sign-In has never been exercised on a real device (see above).
+- Password reset is not built — [auth-plan.md](auth-plan.md) Phase 4/5.

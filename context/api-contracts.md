@@ -164,6 +164,27 @@ latency, or cache hours server-side for a few minutes.
 tag filter on the Spots tab (`_buildFilters` in `main.dart`, options derived from the
 tags actually present across the loaded list, AND semantics across selected tags).
 
+### `Visit`
+
+**Built.** "I'm studying here today" — a lightweight, append-only log entry, separate
+from `SpotEntry` (decision D12). `spotName` is flattened in, same reasoning as
+`MySpotListItem`, so a list of visits renders without a request per row.
+
+```json
+{
+  "id": "018f...",
+  "spotId": "018f...",
+  "spotName": "Brew & Books",
+  "studied": "Organic chemistry",
+  "drinkOrder": "Vanilla latte",
+  "visitedAt": "2026-08-23T18:03:11Z"
+}
+```
+
+`studied` and `drinkOrder` are optional, same free-text treatment as `SpotEntry`'s
+`notes`/`coffeeOrder`. `visitedAt` is stamped by the server at creation and never
+accepted from the client — logging is always "today", not backdated.
+
 ### `Label`
 
 **Built.** The standardized, global tag vocabulary that replaced `Spot.type` (decision
@@ -280,10 +301,25 @@ The Flutter client matches on `type`, not the bare `403` — `POST /me` with no 
 yet (`registration-required`) is also a `403` and means something different. See
 `ApiException.isGuestLimitReached` / `.needsRegistration` in `api_service.dart`.
 
+### Visits
+
+**Built.** "I'm studying here today" — see `### Visit` above and decision D12.
+
+| Method | Path | Notes |
+| --- | --- | --- |
+| `POST` | `/spots/{id}/visits` | Body `{ "studied": "...", "drinkOrder": "..." }`, both optional. `201` with the new `Visit`. Requires an existing `SpotEntry` for the caller on this spot — `403` with `type: "https://studease.app/problems/rating-required"` otherwise. |
+| `GET` | `/spots/{id}/visits` | The caller's own visits to this spot, `Visit[]`, newest first. Backs the spot detail sheet's "Past visits" button. |
+| `GET` | `/me/visits` | Every spot the caller has logged a visit at, `Visit[]`, newest first, capped at 50 (no cursor pagination yet — revisit if this list grows). Backs the Profile tab's study history. |
+
+Unlimited visits per `(user, spot)` — logging is always an insert, never an upsert,
+the opposite of `PUT /spots/{spotId}/entry` above. No edit or delete endpoint: visits
+are a pure, immutable log.
+
 ### My account
 
-**Built** (backend + Flutter, email/password only — see
-[auth-plan.md](auth-plan.md) Phase 4 for Google Sign-In).
+**Built** (backend + Flutter — email/password with email verification, and the
+Google Sign-In provider call; see "Client status" below and [auth-plan.md](auth-plan.md)
+Phase 4 for what's still unverified).
 
 | Method | Path | Notes |
 | --- | --- | --- |
@@ -341,6 +377,11 @@ but no `users` row (for example, a cached Firebase session that outlived a datab
 reset). Previously this fell into the generic `error` phase; now `StudySpotApp` routes
 straight to `ChooseHandlePage` as the root screen, the same screen the ordinary
 guest-links-a-credential flow pushes. See [mobile-app.md](mobile-app.md).
+
+**Flutter — visits built 2026-08-23.** `SpotDetailSheet` has "Log a visit" and "Past
+visits" buttons directly under the spot name — `LogVisitSheet` and `PastVisitsSheet`
+in `study_spots/presentation/`. The Profile tab's `_StudyHistorySection` shows the same
+data across every spot, Beli-style. See D12.
 
 **Flutter — tags built 2026-08-06.** `SpotType` is gone from `theme.dart`; `main.dart`'s
 category circle is one fixed neutral icon now (spots no longer have a single category

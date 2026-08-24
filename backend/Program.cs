@@ -627,6 +627,83 @@ registered.MapDelete("/spots/{id:guid}/entry", async (
     return Results.NoContent();
 });
 
+// ---------------------------------------------------------------------------
+// Visits — "I'm studying here today" log entries. Separate from SpotEntry
+// (decision D2, extended by D12): unlimited per (user, spot), never edited, no
+// rating. Requires an existing SpotEntry for the same spot to create.
+// ---------------------------------------------------------------------------
+
+const string RatingRequiredType = "https://studease.app/problems/rating-required";
+
+// Requires an existing rating on this spot — enforced here, not just hidden in the UI.
+registered.MapPost("/spots/{id:guid}/visits", async (
+    Guid id, LogVisitRequest request, AppDbContext db, CurrentUser currentUser, CancellationToken ct) =>
+{
+    var spot = await db.Spots.FirstOrDefaultAsync(s => s.Id == id, ct);
+    if (spot is null) return Results.NotFound();
+
+    var user = (await currentUser.GetAsync(ct))!;
+
+    var hasRated = await db.SpotEntries.AnyAsync(e => e.SpotId == id && e.UserId == user.Id, ct);
+    if (!hasRated)
+    {
+        return Results.Problem(
+            type: RatingRequiredType,
+            title: "Rate this spot first",
+            detail: $"Log a visit only after you've rated {spot.Name}.",
+            statusCode: StatusCodes.Status403Forbidden);
+    }
+
+    var visit = new SpotVisit
+    {
+        Id = Guid.CreateVersion7(),
+        UserId = user.Id,
+        SpotId = id,
+        Studied = Trimmed(request.Studied),
+        DrinkOrder = Trimmed(request.DrinkOrder),
+        VisitedAt = DateTime.UtcNow,
+    };
+
+    db.SpotVisits.Add(visit);
+    spot.VisitCount++;
+    await db.SaveChangesAsync(ct);
+
+    return Results.Created($"/spots/{id}/visits", new VisitDto(
+        visit.Id, id, spot.Name, visit.Studied, visit.DrinkOrder, visit.VisitedAt));
+});
+
+// This spot, mine only, newest first — backs the detail sheet's "Past visits" button.
+registered.MapGet("/spots/{id:guid}/visits", async (
+    Guid id, AppDbContext db, CurrentUser currentUser, CancellationToken ct) =>
+{
+    var spot = await db.Spots.FirstOrDefaultAsync(s => s.Id == id, ct);
+    if (spot is null) return Results.NotFound();
+
+    var userId = await currentUser.IdAsync(ct);
+
+    return Results.Ok(await db.SpotVisits
+        .Where(v => v.SpotId == id && v.UserId == userId)
+        .OrderByDescending(v => v.VisitedAt)
+        .Select(v => new VisitDto(v.Id, id, spot.Name, v.Studied, v.DrinkOrder, v.VisitedAt))
+        .ToListAsync(ct));
+});
+
+// Every spot I've logged, newest first — backs the Profile tab's study history. Capped
+// rather than cursor-paginated for v1, same tradeoff activity_events' fan-out-on-read
+// makes: fine at this scale, revisit if the list grows.
+registered.MapGet("/me/visits", async (AppDbContext db, CurrentUser currentUser, CancellationToken ct) =>
+{
+    var userId = await currentUser.IdAsync(ct);
+
+    return Results.Ok(await db.SpotVisits
+        .Where(v => v.UserId == userId)
+        .Include(v => v.Spot)
+        .OrderByDescending(v => v.VisitedAt)
+        .Take(50)
+        .Select(v => new VisitDto(v.Id, v.SpotId, v.Spot!.Name, v.Studied, v.DrinkOrder, v.VisitedAt))
+        .ToListAsync(ct));
+});
+
 app.Run();
 
 // ---------------------------------------------------------------------------

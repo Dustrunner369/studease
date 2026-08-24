@@ -54,6 +54,18 @@ public record SpotEntryDto(
     DateTime CreatedAt,
     DateTime UpdatedAt);
 
+public record LogVisitRequest(string? Studied, string? DrinkOrder);
+
+// SpotName is flattened in so both /me/visits and /spots/{id}/visits render without a
+// second request per row — same reasoning as MySpotListItemDto below.
+public record VisitDto(
+    Guid Id,
+    Guid SpotId,
+    string SpotName,
+    string? Studied,
+    string? DrinkOrder,
+    DateTime VisitedAt);
+
 // One row of the ranked Spots tab: a spot flattened together with my entry, so the
 // list renders without a second request per row. Tags here are this entry's own -
 // what drives the client-side tag filter - not the spot-wide aggregate.

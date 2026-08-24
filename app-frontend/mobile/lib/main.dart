@@ -11,6 +11,8 @@ import 'package:mobile/features/authentication/presentation/choose_handle_page.d
 import 'package:mobile/features/authentication/presentation/verify_email_page.dart';
 import 'package:mobile/features/profile/presentation/profile_page.dart';
 import 'package:mobile/features/study_spots/presentation/add_spot_sheet.dart';
+import 'package:mobile/features/study_spots/presentation/log_visit_sheet.dart';
+import 'package:mobile/features/study_spots/presentation/past_visits_sheet.dart';
 import 'package:mobile/services/auth_controller.dart';
 import 'package:mobile/services/api_service.dart';
 import 'package:mobile/models/spot.dart';
@@ -973,6 +975,17 @@ class SpotDetailSheet extends StatelessWidget {
     if (!opened && context.mounted) _soon(context, "Couldn't open Maps");
   }
 
+  // Reachable only from a MySpotListItem row, which only exists once this spot has
+  // been rated — so the server's "rate this spot first" check is defense in depth,
+  // never something this UI path actually needs to handle.
+  Future<void> _logVisit(BuildContext context) async {
+    final logged = await showLogVisitSheet(context, spotId: spot.spotId, spotName: spot.name);
+    if (logged == true && context.mounted) _soon(context, 'Logged your visit to ${spot.name}');
+  }
+
+  Future<void> _pastVisits(BuildContext context) =>
+      showPastVisitsSheet(context, spotId: spot.spotId, spotName: spot.name);
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -1026,6 +1039,28 @@ class SpotDetailSheet extends StatelessWidget {
                     ),
                     const SizedBox(width: 10),
                     _ScoreBubble(score: spot.score, heroTag: 'score-${spot.entryId}'),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _SheetButton(
+                        label: 'Log a visit',
+                        icon: Icons.edit_calendar_outlined,
+                        filled: true,
+                        onTap: () => _logVisit(context),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _SheetButton(
+                        label: 'Past visits',
+                        icon: Icons.history,
+                        filled: false,
+                        onTap: () => _pastVisits(context),
+                      ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 20),
@@ -1420,7 +1455,7 @@ class _NavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = active ? Tone.ink : const Color(0xFF98A2B3);
+    final color = active ? Tone.ink : Tone.terracotta;
 
     return GestureDetector(
       onTap: onTap,

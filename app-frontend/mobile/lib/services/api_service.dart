@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:mobile/models/label.dart';
 import 'package:mobile/models/me.dart';
 import 'package:mobile/models/spot.dart';
+import 'package:mobile/models/visit.dart';
 
 /// Where the API lives.
 ///
@@ -182,6 +183,40 @@ Future<SpotEntry> saveEntry({
 /// Removes my rating. The spot survives — someone else may have rated it too.
 Future<void> deleteEntry(String spotId) async {
   await _send((headers) => http.delete(Uri.parse('$baseUrl/spots/$spotId/entry'), headers: headers));
+}
+
+/// Logs "I'm studying here today". Requires an existing rating on [spotId] — the
+/// server 403s otherwise, though the UI never offers this call without one already
+/// in hand (the detail sheet that triggers it only opens for spots you've rated).
+Future<Visit> logVisit({required String spotId, String? studied, String? drinkOrder}) async {
+  final data = await _send((headers) => http.post(
+        Uri.parse('$baseUrl/spots/$spotId/visits'),
+        headers: headers,
+        body: json.encode({'studied': studied, 'drinkOrder': drinkOrder}),
+      ));
+
+  return Visit.fromJson(data as Map<String, dynamic>);
+}
+
+/// My past visits to one spot, newest first. Backs the detail sheet's "Past visits".
+Future<List<Visit>> fetchSpotVisits(String spotId) async {
+  final data = await _send(
+      (headers) => http.get(Uri.parse('$baseUrl/spots/$spotId/visits'), headers: headers));
+
+  return (data as List<dynamic>)
+      .map((item) => Visit.fromJson(item as Map<String, dynamic>))
+      .toList();
+}
+
+/// Every spot I've logged a visit at, newest first. Backs the Profile tab's study
+/// history.
+Future<List<Visit>> fetchMyVisits() async {
+  final data =
+      await _send((headers) => http.get(Uri.parse('$baseUrl/me/visits'), headers: headers));
+
+  return (data as List<dynamic>)
+      .map((item) => Visit.fromJson(item as Map<String, dynamic>))
+      .toList();
 }
 
 /// The tag picker's data source: only the standardized, moderated vocabulary.

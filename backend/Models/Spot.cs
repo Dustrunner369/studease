@@ -37,6 +37,12 @@ public class Spot : ITimestamped
     // written. Derived data — SpotEntry is the source of truth.
     public int EntryCount { get; set; }
     public decimal? AvgScore { get; set; }
+
+    // Total visits ever logged at this spot, across all users. Cached, incremented at
+    // write time (visits are never edited or deleted, so no recompute pass needed the
+    // way EntryCount/AvgScore need one). Not surfaced anywhere yet — for the future
+    // activity feed and spot popularity.
+    public int VisitCount { get; set; }
     public decimal? AvgWifi { get; set; }
     public decimal? AvgNoise { get; set; }
     public decimal? AvgOutlets { get; set; }

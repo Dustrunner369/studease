@@ -3,9 +3,9 @@
 -- REFERENCE ONLY. EF Core migrations in backend/Migrations are the source of truth;
 -- this file is what those migrations should produce. Keep them in step.
 --
--- STATUS: users, spots, spot_entries, labels, spot_entry_tags and spot_tag_counts are
--- BUILT and verified against Postgres 15. follows, photos and activity_events are
--- DESIGNED ONLY — v2/v3 in the build order.
+-- STATUS: users, spots, spot_entries, labels, spot_entry_tags, spot_tag_counts and
+-- spot_visits are BUILT and verified against Postgres 15. follows, photos and
+-- activity_events are DESIGNED ONLY — v2/v3 in the build order.
 --
 -- Conventions: snake_case, uuid PKs (UUIDv7 minted by the app), timestamptz in UTC,
 -- enums as text + CHECK. See data-model.md for the reasoning behind each.
@@ -93,6 +93,11 @@ CREATE TABLE spots (
     avg_coffee        numeric(2,1),
     -- No avg_group_study on purpose: it stays one user's verdict, never rolled up.
 
+    -- Total spot_visits rows ever logged here, across all users. Incremented at write
+    -- time, not recomputed from scratch — visits are never edited or deleted, so
+    -- there's nothing to desync it. Not surfaced anywhere yet (D12).
+    visit_count       integer     NOT NULL DEFAULT 0,
+
     -- NOTE: deliberately no opening-hours column. Hours are fetched live from the
     -- Places API at render time (decision D8).
 
@@ -170,6 +175,38 @@ CREATE TABLE spot_entries (
 CREATE INDEX spot_entries_user_score_idx ON spot_entries (user_id, score DESC, updated_at DESC);
 -- Drives a spot's detail sheet: who else rated this.
 CREATE INDEX spot_entries_spot_idx       ON spot_entries (spot_id) WHERE visibility <> 'private';
+
+-- ---------------------------------------------------------------------------
+-- spot_visits — "I'm studying here today", an append-only log layered alongside
+-- spot_entries, not replacing it (decision D12, 2026-08-23)
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE spot_visits (
+    id           uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id      uuid        NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    spot_id      uuid        NOT NULL REFERENCES spots (id) ON DELETE CASCADE,
+
+    -- Optional, free text, never parsed — same treatment as spot_entries.notes /
+    -- coffee_order (D6).
+    studied      text,
+    drink_order  text,
+
+    -- Stamped server-side at creation, never client-supplied — logging is always
+    -- "today", not backdated. No updated_at: rows are never edited.
+    visited_at   timestamptz NOT NULL DEFAULT now()
+
+    -- No UNIQUE (user_id, spot_id) — the opposite of spot_entries on purpose. Unlimited
+    -- rows per (user, spot); every visit is an insert, never an update.
+    --
+    -- "Requires an existing spot_entries row for the same (user, spot)" is enforced in
+    -- the API, not here — a cross-table CHECK referencing another table isn't
+    -- expressible in Postgres the way the photos.entry_id/spot_id composite FK is.
+);
+
+-- Drives "my study history" (/me/visits): mine, newest first.
+CREATE INDEX spot_visits_user_visited_idx ON spot_visits (user_id, visited_at DESC);
+-- Drives "past visits at this spot" (/spots/{id}/visits): mine, at this spot, newest first.
+CREATE INDEX spot_visits_spot_user_visited_idx ON spot_visits (spot_id, user_id, visited_at DESC);
 
 -- ---------------------------------------------------------------------------
 -- labels — the standardized, global tag vocabulary that replaced spots.type

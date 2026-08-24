@@ -5,8 +5,11 @@ import 'package:mobile/design/illustrations.dart';
 import 'package:mobile/design/theme.dart';
 import 'package:mobile/features/authentication/presentation/choose_handle_page.dart';
 import 'package:mobile/features/authentication/presentation/login_page.dart';
+import 'package:mobile/features/study_spots/presentation/past_visits_sheet.dart' show formatVisitDate;
 import 'package:mobile/main.dart';
 import 'package:mobile/models/me.dart';
+import 'package:mobile/models/visit.dart';
+import 'package:mobile/services/api_service.dart';
 import 'package:mobile/services/auth_controller.dart';
 
 class ProfilePage extends StatelessWidget {
@@ -199,52 +202,51 @@ class _AccountCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Row(
-          children: [
-            CircleAvatar(
-              radius: 28,
-              backgroundColor: Tone.field,
-              child: Text(
-                me.displayName.isNotEmpty ? me.displayName[0].toUpperCase() : '?',
-                style: GoogleFonts.fraunces(fontSize: 20, fontWeight: FontWeight.w800, color: Tone.ink),
-              ),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    me.displayName,
-                    style: GoogleFonts.fraunces(fontSize: 17, fontWeight: FontWeight.w800, color: Tone.ink),
-                  ),
-                  Text(
-                    '@${me.handle}',
-                    style: GoogleFonts.fraunces(fontSize: 13, fontWeight: FontWeight.w600, color: Tone.muted),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 20),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          decoration: BoxDecoration(color: Tone.field, borderRadius: BorderRadius.circular(14)),
-          child: Row(
-            children: [
-              const Icon(Icons.place_outlined, size: 18, color: Tone.muted),
-              const SizedBox(width: 10),
-              Text(
-                '${me.entryCount} spot${me.entryCount == 1 ? '' : 's'} rated',
-                style: GoogleFonts.fraunces(fontSize: 13.5, fontWeight: FontWeight.w600, color: Tone.ink),
-              ),
-            ],
+        CircleAvatar(
+          radius: 40,
+          backgroundColor: Tone.field,
+          child: Text(
+            me.displayName.isNotEmpty ? me.displayName[0].toUpperCase() : '?',
+            style: GoogleFonts.fraunces(fontSize: 28, fontWeight: FontWeight.w800, color: Tone.ink),
           ),
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 14),
+        Text(
+          me.displayName,
+          style: GoogleFonts.fraunces(fontSize: 19, fontWeight: FontWeight.w800, color: Tone.ink),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          '@${me.handle}',
+          style: GoogleFonts.fraunces(fontSize: 13.5, fontWeight: FontWeight.w600, color: Tone.muted),
+        ),
+        const SizedBox(height: 36),
+        // The one thing worth seeing at a glance — big and centered rather than a
+        // small pill next to an icon.
+        Text(
+          '${me.entryCount}',
+          style: GoogleFonts.fraunces(
+            fontSize: 56,
+            fontWeight: FontWeight.w800,
+            height: 1,
+            color: Tone.terracotta,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          me.entryCount == 1 ? 'spot rated' : 'spots rated',
+          style: GoogleFonts.fraunces(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.5,
+            color: Tone.muted,
+          ),
+        ),
+        const SizedBox(height: 40),
+        const _StudyHistorySection(),
+        const SizedBox(height: 32),
         SizedBox(
           width: double.infinity,
           child: GestureDetector(
@@ -266,6 +268,162 @@ class _AccountCard extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Beli-style study history — every spot I've logged a visit at, newest first. Fetched
+/// fresh on every mount rather than cached: ProfilePage is rebuilt from scratch on each
+/// tab switch (CleanBottomNav.pushReplacement, no IndexedStack), so this naturally picks
+/// up a visit logged moments earlier with no extra state-syncing.
+class _StudyHistorySection extends StatefulWidget {
+  const _StudyHistorySection();
+
+  @override
+  State<_StudyHistorySection> createState() => _StudyHistorySectionState();
+}
+
+class _StudyHistorySectionState extends State<_StudyHistorySection> {
+  List<Visit>? _visits;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final visits = await fetchMyVisits();
+      if (!mounted) return;
+      setState(() => _visits = visits);
+    } on ApiException {
+      // Best-effort: the profile still renders fine without a study history.
+      if (!mounted) return;
+      setState(() => _visits = []);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'STUDY HISTORY',
+          style: GoogleFonts.fraunces(
+            fontSize: 11.5,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 1.2,
+            color: Tone.muted,
+          ),
+        ),
+        const SizedBox(height: 12),
+        _buildBody(),
+      ],
+    );
+  }
+
+  Widget _buildBody() {
+    final visits = _visits;
+
+    if (visits == null) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 8),
+        child: SizedBox(
+          width: 18,
+          height: 18,
+          child: CircularProgressIndicator(strokeWidth: 2, color: Tone.muted),
+        ),
+      );
+    }
+
+    if (visits.isEmpty) {
+      return Text(
+        'No visits yet — log one from a spot you\'ve rated.',
+        style: GoogleFonts.fraunces(fontSize: 13, fontWeight: FontWeight.w500, color: Tone.muted),
+      );
+    }
+
+    return Column(
+      children: [
+        for (var i = 0; i < visits.length && i < 8; i++) ...[
+          if (i > 0) const Divider(height: 1, thickness: 1, color: Tone.line),
+          _VisitHistoryRow(visit: visits[i]),
+        ],
+      ],
+    );
+  }
+}
+
+class _VisitHistoryRow extends StatelessWidget {
+  final Visit visit;
+
+  const _VisitHistoryRow({required this.visit});
+
+  @override
+  Widget build(BuildContext context) {
+    final studied = visit.studied;
+    final drinkOrder = visit.drinkOrder;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  visit.spotName,
+                  style: GoogleFonts.fraunces(fontSize: 14, fontWeight: FontWeight.w700, color: Tone.ink),
+                ),
+                if (studied != null) ...[
+                  const SizedBox(height: 4),
+                  _LabeledLine(label: 'Studied', value: studied),
+                ],
+                if (drinkOrder != null) ...[
+                  const SizedBox(height: 6),
+                  _LabeledLine(label: 'Ordered', value: drinkOrder),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          Text(
+            formatVisitDate(visit.visitedAt),
+            style: GoogleFonts.fraunces(fontSize: 12.5, fontWeight: FontWeight.w700, color: Tone.terracotta),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// A labelled line within a visit row — a bolded title plus its value, so "what I
+/// studied" and "what I ordered" read as clearly distinct.
+class _LabeledLine extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _LabeledLine({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Text.rich(
+      TextSpan(
+        children: [
+          TextSpan(
+            text: '$label: ',
+            style: GoogleFonts.fraunces(fontSize: 13, fontWeight: FontWeight.w700, color: Tone.ink),
+          ),
+          TextSpan(
+            text: value,
+            style: GoogleFonts.fraunces(fontSize: 13, fontWeight: FontWeight.w500, color: Tone.muted),
+          ),
+        ],
+      ),
     );
   }
 }

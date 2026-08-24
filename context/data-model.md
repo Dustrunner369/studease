@@ -8,6 +8,7 @@ Target model for Studease. See [schema.sql](schema.sql) for the DDL and
 ```mermaid
 erDiagram
     users ||--o{ spot_entries : writes
+    users ||--o{ spot_visits : logs
     users ||--o{ spots : "added"
     users ||--o{ photos : uploads
     users ||--o{ follows : follower
@@ -16,6 +17,7 @@ erDiagram
     users ||--o{ labels : requests
     users ||--o{ labels : approves
     spots ||--o{ spot_entries : "is rated by"
+    spots ||--o{ spot_visits : "studied at"
     spots ||--o{ photos : has
     spots ||--o{ spot_tag_counts : aggregates
     spot_entries ||--o{ photos : "attached to"
@@ -40,6 +42,7 @@ erDiagram
         int price_level
         int entry_count "cached"
         numeric avg_score "cached"
+        int visit_count "cached"
     }
     spot_entries {
         uuid id PK
@@ -55,6 +58,14 @@ erDiagram
         numeric score "generated"
         text coffee_order
         text notes
+    }
+    spot_visits {
+        uuid id PK
+        uuid user_id FK
+        uuid spot_id FK
+        text studied
+        text drink_order
+        timestamptz visited_at
     }
     labels {
         uuid id PK
@@ -149,6 +160,11 @@ One row per real-world place. **Globally shared** — not owned by whoever added
   separate table (`spot_tag_counts`), not inline columns here, because tag cardinality
   is variable — unlike the six fixed rating categories, there's no fixed set of
   `avg_*`-shaped columns to add.
+- `visit_count` is also cached, but recomputed differently: it's incremented at write
+  time rather than recomputed from scratch, because `spot_visits` rows are never edited
+  or deleted (see `### spot_visits` below), so there's nothing to desync it. Not
+  surfaced in any client yet — stored ahead of the future activity feed and spot
+  popularity.
 
 ### `spot_entries`
 
@@ -192,6 +208,24 @@ never validated, never parsed.
 
 `visibility` is `public | followers | private`, defaulting to `public`. Private entries
 are excluded from the feed and from a spot's aggregates.
+
+### `spot_visits`
+
+A lightweight, append-only log — "I'm studying here today" — layered alongside
+`spot_entries` rather than folded into it (decision D12, 2026-08-23; see the README for
+why). Unlimited rows per `(user_id, spot_id)`, unlike the `UNIQUE` constraint on
+`spot_entries`: logging a visit is never an update, always an insert. Rows are never
+edited or deleted once created.
+
+`studied` and `drink_order` are optional free text, same treatment as `spot_entries`'
+`notes`/`coffee_order` (D6) — never validated, never parsed. `visited_at` is stamped
+server-side at creation and never client-supplied; logging is always "today", not
+backdated.
+
+Creating a visit **requires an existing `spot_entries` row** for the same
+`(user_id, spot_id)` — you can't log a visit to somewhere you haven't rated. Enforced in
+the API (`Program.cs`), not a database constraint: a cross-table CHECK referencing
+`spot_entries` isn't expressible the way the `photos.entry_id`/`spot_id` composite FK is.
 
 ### `labels`
 
@@ -375,6 +409,9 @@ Full model documented, built in slices (D-scope):
 columns; a single dev user is fine), `spots`, `spot_entries`. Endpoints: place search →
 create-or-return spot, upsert my entry, list my entries ranked by score. This alone fixes
 the score bug, the duplicate-spot problem, and the frozen `OpenUntil`.
+
+**v1.5 — visits.** `spot_visits`, `spots.visit_count`. Independent of v2/v3 — no
+dependency on `follows` or `photos`.
 
 **v2 — social.** `follows`, `activity_events`, the feed endpoint, real auth. The Profile
 tab in the bottom nav becomes real.

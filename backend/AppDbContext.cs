@@ -14,6 +14,7 @@ namespace study_spot_backend
         public DbSet<SpotEntry> SpotEntries => Set<SpotEntry>();
         public DbSet<Label> Labels => Set<Label>();
         public DbSet<SpotTagCount> SpotTagCounts => Set<SpotTagCount>();
+        public DbSet<SpotVisit> SpotVisits => Set<SpotVisit>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -181,6 +182,26 @@ namespace study_spot_backend
                     t.HasCheckConstraint("ck_spot_entries_table_size_range", "table_size BETWEEN 1 AND 5");
                     t.HasCheckConstraint("ck_spot_entries_coffee_range", "coffee BETWEEN 1 AND 5");
                 });
+            });
+
+            modelBuilder.Entity<SpotVisit>(entity =>
+            {
+                // "My study history" (/me/visits): mine, newest first.
+                entity.HasIndex(v => new { v.UserId, v.VisitedAt }).IsDescending(false, true);
+                // "Past visits at this spot" (/spots/{id}/visits): mine, at this spot,
+                // newest first.
+                entity.HasIndex(v => new { v.SpotId, v.UserId, v.VisitedAt })
+                    .IsDescending(false, false, true);
+
+                entity.HasOne(v => v.User)
+                    .WithMany()
+                    .HasForeignKey(v => v.UserId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(v => v.Spot)
+                    .WithMany()
+                    .HasForeignKey(v => v.SpotId)
+                    .OnDelete(DeleteBehavior.Cascade);
             });
         }
 
