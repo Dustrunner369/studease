@@ -74,9 +74,6 @@ class _AddSpotSheetState extends State<AddSpotSheet> {
   bool _saving = false;
   String? _error;
 
-  // Only ever set for a brand-new spot (never on an edit) — see _save().
-  bool _showCelebration = false;
-
   @override
   void initState() {
     super.initState();
@@ -262,11 +259,12 @@ class _AddSpotSheetState extends State<AddSpotSheet> {
 
       if (!mounted) return;
 
-      // A brand-new spot gets the celebration card, which pops the sheet itself
-      // once it's played out; an edit just pops immediately like before.
+      // A brand-new spot gets a floating celebration card stacked on top of this
+      // still-open sheet — the sheet itself stays a plain bottom sheet; only the
+      // moment of delight floats. An edit just pops immediately like before.
       if (widget.existing == null) {
-        setState(() => _showCelebration = true);
-        return;
+        await _showCelebrationDialog();
+        if (!mounted) return;
       }
       Navigator.of(context).pop(true);
     } on ApiException catch (e) {
@@ -283,6 +281,34 @@ class _AddSpotSheetState extends State<AddSpotSheet> {
         _saving = false;
       });
     }
+  }
+
+  // Floats a centered celebration card on top of this still-open bottom sheet —
+  // fade + scale in, matching showLogVisitDialog's treatment — rather than
+  // swapping the sheet's own content in place.
+  Future<void> _showCelebrationDialog() {
+    final spotName = _selectedPlace?.name ?? _nameController.text.trim();
+    final tagCount = _selectedTagSlugs.length;
+
+    return showGeneralDialog<void>(
+      context: context,
+      barrierLabel: 'Spot saved',
+      barrierColor: Colors.black54,
+      barrierDismissible: false,
+      transitionDuration: Motion.short,
+      pageBuilder: (context, animation, secondaryAnimation) =>
+          _CelebrationDialog(spotName: spotName, tagCount: tagCount),
+      transitionBuilder: (context, animation, secondaryAnimation, child) {
+        final curved = CurvedAnimation(parent: animation, curve: Motion.easeOut);
+        return FadeTransition(
+          opacity: curved,
+          child: ScaleTransition(
+            scale: Tween<double>(begin: 0.96, end: 1.0).animate(curved),
+            child: child,
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _showGuestLimitDialog() async {
@@ -341,23 +367,6 @@ class _AddSpotSheetState extends State<AddSpotSheet> {
 
   @override
   Widget build(BuildContext context) {
-    if (_showCelebration) {
-      return Container(
-        decoration: const BoxDecoration(
-          color: Tone.bg,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        child: SafeArea(
-          top: false,
-          child: JournalSavedCard(
-            spotName: _selectedPlace?.name ?? _nameController.text.trim(),
-            tagCount: _selectedTagSlugs.length,
-            onDone: () => Navigator.of(context).pop(true),
-          ),
-        ),
-      );
-    }
-
     return Padding(
       // Lifts the sheet clear of the keyboard.
       padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
@@ -849,6 +858,46 @@ class _AddSpotSheetState extends State<AddSpotSheet> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// The floating "spot saved" moment shown on top of [AddSpotSheet] once a
+/// brand-new spot is saved — see [_AddSpotSheetState._showCelebrationDialog].
+class _CelebrationDialog extends StatelessWidget {
+  final String spotName;
+  final int tagCount;
+
+  const _CelebrationDialog({required this.spotName, required this.tagCount});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 380),
+        child: Material(
+          color: Colors.transparent,
+          child: Container(
+            decoration: BoxDecoration(
+              color: Tone.bg,
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.2),
+                  blurRadius: 30,
+                  offset: const Offset(0, 14),
+                ),
+              ],
+            ),
+            padding: const EdgeInsets.fromLTRB(24, 22, 24, 22),
+            child: JournalSavedCard(
+              spotName: spotName,
+              tagCount: tagCount,
+              onDone: () => Navigator.of(context).pop(),
+            ),
+          ),
+        ),
       ),
     );
   }
