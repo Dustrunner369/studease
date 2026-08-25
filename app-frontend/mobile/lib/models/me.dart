@@ -9,6 +9,9 @@ class Me {
   final String displayName;
   final bool isGuest;
   final int entryCount;
+  // One of design/illustrations.dart's avatarIconIds, or null before the user has
+  // picked one — the profile page falls back to displayName's first letter then.
+  final String? avatarId;
 
   const Me({
     required this.id,
@@ -16,6 +19,7 @@ class Me {
     required this.displayName,
     required this.isGuest,
     required this.entryCount,
+    this.avatarId,
   });
 
   factory Me.fromJson(Map<String, dynamic> json) => Me(
@@ -24,5 +28,6 @@ class Me {
         displayName: json['displayName'] as String,
         isGuest: json['isGuest'] as bool,
         entryCount: (json['entryCount'] as num).toInt(),
+        avatarId: json['avatarId'] as String?,
       );
 }

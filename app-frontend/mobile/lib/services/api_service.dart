@@ -83,6 +83,18 @@ Future<Me> registerMe({required String handle, required String displayName}) asy
   return Me.fromJson(data as Map<String, dynamic>);
 }
 
+/// Sets my preset profile icon. [avatarId] must be one of design/illustrations.dart's
+/// avatarIconIds or the server 400s.
+Future<Me> setAvatar(String avatarId) async {
+  final data = await _send((headers) => http.put(
+        Uri.parse('$baseUrl/me/avatar'),
+        headers: headers,
+        body: json.encode({'avatarId': avatarId}),
+      ));
+
+  return Me.fromJson(data as Map<String, dynamic>);
+}
+
 /// The ranked Spots tab: my entries, best first.
 Future<List<MySpotListItem>> fetchMySpots() async {
   final data =

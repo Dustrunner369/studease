@@ -34,6 +34,9 @@ namespace study_spot_backend
                     // missing entirely until this migration; see "Drift, found while writing
                     // this" in context/auth-plan.md.
                     t.HasCheckConstraint("ck_users_handle_format", "handle ~ '^[a-z0-9_]{3,30}$'");
+                    t.HasCheckConstraint("ck_users_avatar_id_valid",
+                        "avatar_id IN ('cafe_01', 'cafe_02', 'cafe_03', 'cafe_04', 'cafe_05', " +
+                        "'cafe_06', 'cafe_07', 'cafe_08', 'cafe_09', 'cafe_10') OR avatar_id IS NULL");
                 });
 
                 entity.HasData(new User

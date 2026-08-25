@@ -63,6 +63,13 @@ class AuthController extends ChangeNotifier {
     notifyListeners();
   }
 
+  // Sets the signed-in user's preset profile icon. Not offered to guests — the picker
+  // only appears on _AccountCard, which _GuestPrompt is shown instead of.
+  Future<void> updateAvatar(String avatarId) async {
+    me = await setAvatar(avatarId);
+    notifyListeners();
+  }
+
   // Allows user to input a custom handle
   Future<void> completeRegistration({required String handle, required String displayName}) async {
     me = await registerMe(handle: handle, displayName: displayName);

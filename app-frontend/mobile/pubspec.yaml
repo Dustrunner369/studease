@@ -76,6 +76,7 @@ flutter:
   # here to replace the CustomPainter placeholders in lib/design/illustrations.dart.
   assets:
     - assets/illustrations/
+    - assets/illustrations/pfpIcons/
 
   # To add assets to your application, add an assets section, like this:
   # assets:

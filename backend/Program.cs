@@ -185,7 +185,7 @@ api.MapGet("/me", async (CurrentUser currentUser, AppDbContext db, CancellationT
 
     var entryCount = await db.SpotEntries.CountAsync(e => e.UserId == user.Id, ct);
 
-    return Results.Ok(new MeDto(user.Id, user.Handle, user.DisplayName, user.IsGuest, entryCount));
+    return Results.Ok(new MeDto(user.Id, user.Handle, user.DisplayName, user.IsGuest, entryCount, user.AvatarId));
 });
 
 // Completes registration. Works whether this identity is brand new, or a guest
@@ -241,7 +241,7 @@ api.MapPost("/me", async (RegisterRequest request, CurrentUser currentUser, AppD
         db.Users.Add(created);
         await db.SaveChangesAsync(ct);
 
-        return Results.Created("/me", new MeDto(created.Id, created.Handle, created.DisplayName, false, 0));
+        return Results.Created("/me", new MeDto(created.Id, created.Handle, created.DisplayName, false, 0, created.AvatarId));
     }
 
     existing.Handle = handle;
@@ -253,7 +253,30 @@ api.MapPost("/me", async (RegisterRequest request, CurrentUser currentUser, AppD
 
     var entryCount = await db.SpotEntries.CountAsync(e => e.UserId == existing.Id, ct);
 
-    return Results.Ok(new MeDto(existing.Id, existing.Handle, existing.DisplayName, false, entryCount));
+    return Results.Ok(new MeDto(existing.Id, existing.Handle, existing.DisplayName, false, entryCount, existing.AvatarId));
+});
+
+// Sets the caller's preset profile icon - the only piece of Me that's mutable outside
+// registration. A plain 400 (not ValidationProblem) since there's exactly one field and
+// "must be one of the preset icons" doesn't need the errors-dictionary shape.
+registered.MapPut("/me/avatar", async (
+    UpdateAvatarRequest request, CurrentUser currentUser, AppDbContext db, CancellationToken ct) =>
+{
+    if (!AvatarIds.IsValid(request.AvatarId))
+    {
+        return Results.Problem(
+            title: "Invalid avatar",
+            detail: "avatarId must be one of the preset icons.",
+            statusCode: StatusCodes.Status400BadRequest);
+    }
+
+    var user = await currentUser.GetAsync(ct);
+    user!.AvatarId = request.AvatarId;
+    await db.SaveChangesAsync(ct);
+
+    var entryCount = await db.SpotEntries.CountAsync(e => e.UserId == user.Id, ct);
+
+    return Results.Ok(new MeDto(user.Id, user.Handle, user.DisplayName, user.IsGuest, entryCount, user.AvatarId));
 });
 
 // ---------------------------------------------------------------------------

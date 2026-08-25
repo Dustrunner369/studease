@@ -199,6 +199,33 @@ class CafeShelfSketch extends StatelessWidget {
 /// A puzzled cat — the one non-coffee sketch, reserved for "you're not signed in
 /// yet" on the Profile tab rather than the empty/loading states the coffee sketches
 /// cover.
+/// The ten preset profile-picture options (assets/illustrations/pfpIcons), in picker
+/// order. Each is a self-contained hand-drawn illustration, not a uniform portrait —
+/// canvas sizes vary — so [AvatarIconSketch] always frames them in a square box with
+/// [BoxFit.contain] rather than assuming a fixed aspect ratio like the sketches above.
+const List<String> avatarIconIds = [
+  'cafe_01', 'cafe_02', 'cafe_03', 'cafe_04', 'cafe_05',
+  'cafe_06', 'cafe_07', 'cafe_08', 'cafe_09', 'cafe_10',
+];
+
+class AvatarIconSketch extends StatelessWidget {
+  final String avatarId;
+  final double size;
+  final Color color;
+
+  const AvatarIconSketch({super.key, required this.avatarId, this.size = 80, this.color = Tone.ink});
+
+  @override
+  Widget build(BuildContext context) {
+    return _AssetSketch(
+      asset: 'assets/illustrations/pfpIcons/$avatarId.png',
+      width: size,
+      height: size,
+      color: color,
+    );
+  }
+}
+
 class ConfusedCatSketch extends StatelessWidget {
   final double size;
   final Color color;

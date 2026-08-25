@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:mobile/design/illustrations.dart';
 import 'package:mobile/design/theme.dart';
 import 'package:mobile/features/authentication/presentation/choose_handle_page.dart';
+import 'package:mobile/features/profile/presentation/avatar_picker_page.dart';
 import 'package:mobile/features/authentication/presentation/login_page.dart';
 import 'package:mobile/features/study_spots/presentation/past_visits_sheet.dart' show formatVisitDate;
 import 'package:mobile/main.dart';
@@ -199,17 +200,61 @@ class _AccountCard extends StatelessWidget {
     );
   }
 
+  Future<void> _pickAvatar(BuildContext context) async {
+    final avatarId = await showAvatarPickerPage(context, selectedAvatarId: me.avatarId);
+    if (avatarId == null || !context.mounted) return;
+
+    try {
+      await auth.updateAvatar(avatarId);
+    } on ApiException catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: Tone.ink,
+          content: Text(
+            e.message,
+            style: GoogleFonts.fraunces(fontSize: 13.5, fontWeight: FontWeight.w600, color: Colors.white),
+          ),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        CircleAvatar(
-          radius: 40,
-          backgroundColor: Tone.field,
-          child: Text(
-            me.displayName.isNotEmpty ? me.displayName[0].toUpperCase() : '?',
-            style: GoogleFonts.fraunces(fontSize: 28, fontWeight: FontWeight.w800, color: Tone.ink),
+        GestureDetector(
+          onTap: () => _pickAvatar(context),
+          child: Stack(
+            alignment: Alignment.bottomRight,
+            children: [
+              CircleAvatar(
+                radius: 40,
+                backgroundColor: Tone.field,
+                // cafe_01 draws its own circular frame, so it fills the CircleAvatar
+                // edge-to-edge; the others get a small margin so they don't crowd it.
+                child: me.avatarId != null
+                    ? AvatarIconSketch(
+                        avatarId: me.avatarId!,
+                        size: me.avatarId == 'cafe_01' ? 80 : 64,
+                      )
+                    : Text(
+                        me.displayName.isNotEmpty ? me.displayName[0].toUpperCase() : '?',
+                        style: GoogleFonts.fraunces(fontSize: 28, fontWeight: FontWeight.w800, color: Tone.ink),
+                      ),
+              ),
+              Container(
+                padding: const EdgeInsets.all(5),
+                decoration: BoxDecoration(
+                  color: Tone.terracotta,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Tone.bg, width: 2),
+                ),
+                child: const Icon(Icons.edit, size: 12, color: Colors.white),
+              ),
+            ],
           ),
         ),
         const SizedBox(height: 14),
