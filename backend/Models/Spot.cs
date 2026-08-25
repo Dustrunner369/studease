@@ -38,10 +38,11 @@ public class Spot : ITimestamped
     public int EntryCount { get; set; }
     public decimal? AvgScore { get; set; }
 
-    // Total visits ever logged at this spot, across all users. Cached, incremented at
-    // write time (visits are never edited or deleted, so no recompute pass needed the
-    // way EntryCount/AvgScore need one). Not surfaced anywhere yet — for the future
-    // activity feed and spot popularity.
+    // Total visits ever logged at this spot, across all users. Cached: incremented on
+    // create and decremented on delete inline, no recompute pass needed the way
+    // EntryCount/AvgScore need one (visits are never edited in place, only added or
+    // removed outright). Not surfaced anywhere yet — for the future activity feed and
+    // spot popularity.
     public int VisitCount { get; set; }
     public decimal? AvgWifi { get; set; }
     public decimal? AvgNoise { get; set; }

@@ -215,7 +215,9 @@ A lightweight, append-only log — "I'm studying here today" — layered alongsi
 `spot_entries` rather than folded into it (decision D12, 2026-08-23; see the README for
 why). Unlimited rows per `(user_id, spot_id)`, unlike the `UNIQUE` constraint on
 `spot_entries`: logging a visit is never an update, always an insert. Rows are never
-edited or deleted once created.
+edited in place once created, but can be deleted outright to undo a mislog (decision
+D13, 2026-08-24) — the one mutation D12's append-only design allows — which
+decrements `spots.visit_count` inline rather than triggering a recompute.
 
 `studied` and `drink_order` are optional free text, same treatment as `spot_entries`'
 `notes`/`coffee_order` (D6) — never validated, never parsed. `visited_at` is stamped

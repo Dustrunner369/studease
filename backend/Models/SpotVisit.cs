@@ -1,9 +1,11 @@
 namespace study_spot_backend.Models;
 
 // One "I'm studying here today" log entry — separate from SpotEntry (decision D2,
-// extended by D12): unlimited per (user, spot), immutable once created, carries no
-// rating. Requires an existing SpotEntry for the same (user, spot) to create — enforced
-// in Program.cs, not a DB constraint (a cross-table CHECK isn't expressible).
+// extended by D12): unlimited per (user, spot), never edited once created, carries no
+// rating. Deletable (undoes a mislog) — see the DELETE route in Program.cs, which also
+// keeps Spot.VisitCount in sync. Requires an existing SpotEntry for the same
+// (user, spot) to create — enforced in Program.cs, not a DB constraint (a cross-table
+// CHECK isn't expressible).
 public class SpotVisit
 {
     public Guid Id { get; set; }

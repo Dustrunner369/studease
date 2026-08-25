@@ -630,7 +630,9 @@ registered.MapDelete("/spots/{id:guid}/entry", async (
 // ---------------------------------------------------------------------------
 // Visits — "I'm studying here today" log entries. Separate from SpotEntry
 // (decision D2, extended by D12): unlimited per (user, spot), never edited, no
-// rating. Requires an existing SpotEntry for the same spot to create.
+// rating. Requires an existing SpotEntry for the same spot to create. Rows
+// can be deleted (undoing a mislog) but never updated in place — see the
+// DELETE route below, which is the one mutation D12's "append-only" allows.
 // ---------------------------------------------------------------------------
 
 const string RatingRequiredType = "https://studease.app/problems/rating-required";
@@ -686,6 +688,28 @@ registered.MapGet("/spots/{id:guid}/visits", async (
         .OrderByDescending(v => v.VisitedAt)
         .Select(v => new VisitDto(v.Id, id, spot.Name, v.Studied, v.DrinkOrder, v.VisitedAt))
         .ToListAsync(ct));
+});
+
+// Undoes a mislogged visit. Doesn't touch SpotEntry (the rating) — only the log
+// entry itself — and keeps VisitCount in sync since nothing else recomputes it.
+registered.MapDelete("/spots/{id:guid}/visits/{visitId:guid}", async (
+    Guid id, Guid visitId, AppDbContext db, CurrentUser currentUser, CancellationToken ct) =>
+{
+    var userId = await currentUser.IdAsync(ct);
+
+    var visit = await db.SpotVisits
+        .FirstOrDefaultAsync(v => v.Id == visitId && v.SpotId == id && v.UserId == userId, ct);
+
+    if (visit is null) return Results.NotFound();
+
+    db.SpotVisits.Remove(visit);
+
+    var spot = await db.Spots.FirstOrDefaultAsync(s => s.Id == id, ct);
+    if (spot is not null && spot.VisitCount > 0) spot.VisitCount--;
+
+    await db.SaveChangesAsync(ct);
+
+    return Results.NoContent();
 });
 
 // Every spot I've logged, newest first — backs the Profile tab's study history. Capped

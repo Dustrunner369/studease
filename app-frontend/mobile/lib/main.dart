@@ -978,10 +978,10 @@ class SpotDetailSheet extends StatelessWidget {
   // Reachable only from a MySpotListItem row, which only exists once this spot has
   // been rated — so the server's "rate this spot first" check is defense in depth,
   // never something this UI path actually needs to handle.
-  Future<void> _logVisit(BuildContext context) async {
-    final logged = await showLogVisitSheet(context, spotId: spot.spotId, spotName: spot.name);
-    if (logged == true && context.mounted) _soon(context, 'Logged your visit to ${spot.name}');
-  }
+  // No follow-up toast needed here — the sheet's own celebration card already
+  // confirms the visit before it pops.
+  Future<void> _logVisit(BuildContext context) =>
+      showLogVisitDialog(context, spotId: spot.spotId, spotName: spot.name);
 
   Future<void> _pastVisits(BuildContext context) =>
       showPastVisitsSheet(context, spotId: spot.spotId, spotName: spot.name);

@@ -198,6 +198,13 @@ Future<Visit> logVisit({required String spotId, String? studied, String? drinkOr
   return Visit.fromJson(data as Map<String, dynamic>);
 }
 
+/// Undoes a mislogged visit — the one mutation visits allow (see Visit's doc comment).
+/// Doesn't touch the rating at [spotId], only this one log entry.
+Future<void> deleteVisit({required String spotId, required String visitId}) async {
+  await _send(
+      (headers) => http.delete(Uri.parse('$baseUrl/spots/$spotId/visits/$visitId'), headers: headers));
+}
+
 /// My past visits to one spot, newest first. Backs the detail sheet's "Past visits".
 Future<List<Visit>> fetchSpotVisits(String spotId) async {
   final data = await _send(

@@ -39,6 +39,7 @@ Places API when a spot is rendered.
 | D10 | `spots.type` replaced by a standardized, moderated tag system (2026-08-06) | `labels` + `spot_entry_tags` + `spot_tag_counts`; tags are per-entry (like `group_study`), aggregated onto the spot; new labels need `users.is_admin` approval before they're usable |
 | D11 | Labels carry a positive/negative polarity, set by the admin at approval, not the requester (2026-08-17) | `labels.polarity`, nullable, `CHECK` restricted to `positive`/`negative`; `POST /admin/labels/{id}/approve` now requires it in the body |
 | D12 | A separate, append-only `spot_visits` log, layered alongside D2, not replacing it (2026-08-23) | `spot_visits`: many rows per (user, spot), no uniqueness constraint; requires an existing `spot_entries` row to create one |
+| D13 | Visits are deletable after all — "append-only" meant never *edited*, not never *removed* (2026-08-24) | `DELETE /spots/{id}/visits/{visitId}`; ownership checked the same way as `DELETE /spots/{id}/entry`; `spots.visit_count` decremented inline, no recompute pass |
 
 ### Why D9 exists
 
@@ -65,6 +66,21 @@ mean giving up the `UNIQUE (user_id, spot_id)` constraint D2 relies on — visit
 own table. Requiring an existing rating to log a visit (enforced in the API, not a DB
 constraint — a cross-table CHECK isn't expressible) keeps the two concepts linked without
 merging them: you can't log a visit to somewhere you've never rated.
+
+### Why D13 exists
+
+The Flutter client added swipe-to-delete on a logged visit — the iMessage row-action
+pattern, tap a revealed button to remove it, undoing a mislog (wrong spot, fat-fingered
+during onboarding, whatever). D12's "append-only" language was written to rule out
+*editing* a visit in place — `spot_entries` already owns "one edited-in-place record,"
+and a visit shouldn't grow that same mutable shape. It was never meant to rule out
+removing a row outright; there was just no product need for it yet. Deleting is `DELETE
+/spots/{id}/visits/{visitId}`, checked the same way `DELETE /spots/{id}/entry` already
+verifies ownership (`SpotId == id && UserId == userId`, `404` if it's not yours or
+doesn't exist). `spots.visit_count` — cached and incremented on create — is decremented
+inline on delete rather than earning a recompute pass, the same "cheap enough not to
+bother" call D12 made for incrementing it. No `updated_at` was added to `spot_visits`,
+and there still isn't one: rows still can't be edited, only created or removed.
 
 ### Why D10 exists
 
@@ -97,8 +113,9 @@ v1 is in. `users`, `spots`, and `spot_entries` exist, with the add-spot, edit-sp
 (see "Still open" #1) and the `labels`/tag system (D10, plus polarity D11) are also
 built. `spot_visits` (D12, 2026-08-23) is built too — log/list-per-spot/list-mine
 endpoints, the Flutter "Log a visit"/"Past visits" buttons on the spot detail sheet, and
-the Profile tab's study history. Postgres itself has been hosted on Neon since
-2026-08-20 — see [infra.md](infra.md).
+the Profile tab's study history. Delete (D13, 2026-08-24) followed the next day —
+swipe-to-delete on a `PastVisitsSheet` row. Postgres itself has been hosted on Neon
+since 2026-08-20 — see [infra.md](infra.md).
 
 `follows`, `photos`, and `activity_events` are designed in this folder but **not built**
 — they're v2/v3 in the build order below. [schema.sql](schema.sql) marks which is which.

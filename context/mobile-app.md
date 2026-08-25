@@ -44,9 +44,11 @@ else is a screen pushed on top, or a modal sheet:
   "Client-only features").
 - `TagPickerPage` — modal, opened from `AddSpotSheet`.
 - `SpotDetailSheet` — modal, opened from a row on the Spots tab.
-- `LogVisitSheet` (`showLogVisitSheet`) / `PastVisitsSheet` (`showPastVisitsSheet`) —
-  modals opened from `SpotDetailSheet`'s "Log a visit" / "Past visits" buttons. See
-  [api-contracts.md](api-contracts.md) § Visits (D12).
+- `LogVisitDialog` (`showLogVisitDialog`) / `PastVisitsSheet` (`showPastVisitsSheet`) —
+  opened from `SpotDetailSheet`'s "Log a visit" / "Past visits" buttons. The former is a
+  centered dialog, not a bottom sheet, despite the file name (`log_visit_sheet.dart`).
+  `PastVisitsSheet` rows swipe left to reveal a delete button (D13). See
+  [api-contracts.md](api-contracts.md) § Visits (D12/D13).
 
 ## Boot and auth state
 

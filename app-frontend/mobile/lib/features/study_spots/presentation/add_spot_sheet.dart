@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:mobile/design/celebrations.dart';
 import 'package:mobile/design/theme.dart';
 import 'package:mobile/features/authentication/presentation/login_page.dart';
 import 'package:mobile/features/study_spots/presentation/tag_picker_page.dart';
@@ -72,6 +73,9 @@ class _AddSpotSheetState extends State<AddSpotSheet> {
 
   bool _saving = false;
   String? _error;
+
+  // Only ever set for a brand-new spot (never on an edit) — see _save().
+  bool _showCelebration = false;
 
   @override
   void initState() {
@@ -257,6 +261,13 @@ class _AddSpotSheetState extends State<AddSpotSheet> {
       unawaited(widget.auth.refreshMe());
 
       if (!mounted) return;
+
+      // A brand-new spot gets the celebration card, which pops the sheet itself
+      // once it's played out; an edit just pops immediately like before.
+      if (widget.existing == null) {
+        setState(() => _showCelebration = true);
+        return;
+      }
       Navigator.of(context).pop(true);
     } on ApiException catch (e) {
       if (!mounted) return;
@@ -330,6 +341,23 @@ class _AddSpotSheetState extends State<AddSpotSheet> {
 
   @override
   Widget build(BuildContext context) {
+    if (_showCelebration) {
+      return Container(
+        decoration: const BoxDecoration(
+          color: Tone.bg,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: SafeArea(
+          top: false,
+          child: JournalSavedCard(
+            spotName: _selectedPlace?.name ?? _nameController.text.trim(),
+            tagCount: _selectedTagSlugs.length,
+            onDone: () => Navigator.of(context).pop(true),
+          ),
+        ),
+      );
+    }
+
     return Padding(
       // Lifts the sheet clear of the keyboard.
       padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),

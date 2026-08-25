@@ -166,9 +166,11 @@ tags actually present across the loaded list, AND semantics across selected tags
 
 ### `Visit`
 
-**Built.** "I'm studying here today" — a lightweight, append-only log entry, separate
-from `SpotEntry` (decision D12). `spotName` is flattened in, same reasoning as
-`MySpotListItem`, so a list of visits renders without a request per row.
+**Built.** "I'm studying here today" — a lightweight log entry, separate from
+`SpotEntry` (decision D12). Logging is always an insert, never an edit-in-place — but a
+whole row is deletable outright, to undo a mislog (decision D13). `spotName` is
+flattened in, same reasoning as `MySpotListItem`, so a list of visits renders without a
+request per row.
 
 ```json
 {
@@ -303,17 +305,20 @@ yet (`registration-required`) is also a `403` and means something different. See
 
 ### Visits
 
-**Built.** "I'm studying here today" — see `### Visit` above and decision D12.
+**Built.** "I'm studying here today" — see `### Visit` above and decisions D12/D13.
 
 | Method | Path | Notes |
 | --- | --- | --- |
 | `POST` | `/spots/{id}/visits` | Body `{ "studied": "...", "drinkOrder": "..." }`, both optional. `201` with the new `Visit`. Requires an existing `SpotEntry` for the caller on this spot — `403` with `type: "https://studease.app/problems/rating-required"` otherwise. |
 | `GET` | `/spots/{id}/visits` | The caller's own visits to this spot, `Visit[]`, newest first. Backs the spot detail sheet's "Past visits" button. |
 | `GET` | `/me/visits` | Every spot the caller has logged a visit at, `Visit[]`, newest first, capped at 50 (no cursor pagination yet — revisit if this list grows). Backs the Profile tab's study history. |
+| `DELETE` | `/spots/{id}/visits/{visitId}` | **Built 2026-08-24 (D13).** Removes one visit — undoes a mislog. Ownership checked the same way as `DELETE /spots/{id}/entry`: scoped to `SpotId == id && UserId == userId`, `404` if no match. `204` on success; decrements `spots.visit_count` inline. |
 
 Unlimited visits per `(user, spot)` — logging is always an insert, never an upsert,
-the opposite of `PUT /spots/{spotId}/entry` above. No edit or delete endpoint: visits
-are a pure, immutable log.
+the opposite of `PUT /spots/{spotId}/entry` above. Still no edit endpoint — a visit's
+`studied`/`drinkOrder`/`visitedAt` can't be changed once created — but as of D13 a whole
+row can be deleted outright. "Immutable" turned out to mean "never edited," not "never
+removed."
 
 ### My account
 
@@ -379,9 +384,15 @@ straight to `ChooseHandlePage` as the root screen, the same screen the ordinary
 guest-links-a-credential flow pushes. See [mobile-app.md](mobile-app.md).
 
 **Flutter — visits built 2026-08-23.** `SpotDetailSheet` has "Log a visit" and "Past
-visits" buttons directly under the spot name — `LogVisitSheet` and `PastVisitsSheet`
-in `study_spots/presentation/`. The Profile tab's `_StudyHistorySection` shows the same
-data across every spot, Beli-style. See D12.
+visits" buttons directly under the spot name — `LogVisitDialog` (`showLogVisitDialog`,
+a centered dialog, not a bottom sheet — renamed from `LogVisitSheet` once it stopped
+being one) and `PastVisitsSheet` in `study_spots/presentation/`. The Profile tab's
+`_StudyHistorySection` shows the same data across every spot, Beli-style. See D12.
+
+**Flutter — visit delete built 2026-08-24 (D13).** `PastVisitsSheet` rows swipe left,
+iMessage-style, to reveal a pinned delete button (`_SwipeToDeleteRow`, hand-rolled drag
++ `AnimationController`, no new dependency) — tapping it calls the new `DELETE`
+endpoint above and removes the row only once that succeeds.
 
 **Flutter — tags built 2026-08-06.** `SpotType` is gone from `theme.dart`; `main.dart`'s
 category circle is one fixed neutral icon now (spots no longer have a single category

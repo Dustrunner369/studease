@@ -94,8 +94,9 @@ CREATE TABLE spots (
     -- No avg_group_study on purpose: it stays one user's verdict, never rolled up.
 
     -- Total spot_visits rows ever logged here, across all users. Incremented at write
-    -- time, not recomputed from scratch — visits are never edited or deleted, so
-    -- there's nothing to desync it. Not surfaced anywhere yet (D12).
+    -- time and decremented on delete (D13), not recomputed from scratch — visits are
+    -- never edited in place, only added or removed outright, so there's nothing to
+    -- desync it. Not surfaced anywhere yet (D12).
     visit_count       integer     NOT NULL DEFAULT 0,
 
     -- NOTE: deliberately no opening-hours column. Hours are fetched live from the
@@ -178,7 +179,10 @@ CREATE INDEX spot_entries_spot_idx       ON spot_entries (spot_id) WHERE visibil
 
 -- ---------------------------------------------------------------------------
 -- spot_visits — "I'm studying here today", an append-only log layered alongside
--- spot_entries, not replacing it (decision D12, 2026-08-23)
+-- spot_entries, not replacing it (decision D12, 2026-08-23). "Append-only" means
+-- rows are never edited in place, not that they're permanent — a whole row can be
+-- deleted outright to undo a mislog (decision D13, 2026-08-24); see the API layer,
+-- there's no DB-level cascade or trigger for it.
 -- ---------------------------------------------------------------------------
 
 CREATE TABLE spot_visits (

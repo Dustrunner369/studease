@@ -1,40 +1,59 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:mobile/design/celebrations.dart';
 import 'package:mobile/design/theme.dart';
 import 'package:mobile/services/api_service.dart';
 
-/// Logs "I'm studying here today" at [spotId]. Both fields are optional, so the save
-/// button is always enabled — there's nothing to validate. Returns `true` on a
-/// successful log, `null`/`false` otherwise.
-Future<bool?> showLogVisitSheet(
+const _studiedMaxLength = 200;
+const _drinkMaxLength = 60;
+
+/// Opens as a centered card rather than a bottom sheet — logging a visit is a
+/// deliberate, journal-like moment, not routine editing. Both fields are
+/// optional, so the save button is always enabled — there's nothing to
+/// validate. Returns `true` on a successful log, `null`/`false` otherwise.
+Future<bool?> showLogVisitDialog(
   BuildContext context, {
   required String spotId,
   required String spotName,
 }) {
-  return showModalBottomSheet<bool>(
+  return showGeneralDialog<bool>(
     context: context,
-    backgroundColor: Colors.transparent,
-    isScrollControlled: true,
-    builder: (_) => LogVisitSheet(spotId: spotId, spotName: spotName),
+    barrierLabel: 'Log a visit',
+    barrierColor: Colors.black54,
+    barrierDismissible: true,
+    transitionDuration: Motion.short,
+    pageBuilder: (context, animation, secondaryAnimation) =>
+        LogVisitDialog(spotId: spotId, spotName: spotName),
+    transitionBuilder: (context, animation, secondaryAnimation, child) {
+      final curved = CurvedAnimation(parent: animation, curve: Motion.easeOut);
+      return FadeTransition(
+        opacity: curved,
+        child: ScaleTransition(
+          scale: Tween<double>(begin: 0.96, end: 1.0).animate(curved),
+          child: child,
+        ),
+      );
+    },
   );
 }
 
-class LogVisitSheet extends StatefulWidget {
+class LogVisitDialog extends StatefulWidget {
   final String spotId;
   final String spotName;
 
-  const LogVisitSheet({super.key, required this.spotId, required this.spotName});
+  const LogVisitDialog({super.key, required this.spotId, required this.spotName});
 
   @override
-  State<LogVisitSheet> createState() => _LogVisitSheetState();
+  State<LogVisitDialog> createState() => _LogVisitDialogState();
 }
 
-class _LogVisitSheetState extends State<LogVisitSheet> {
+class _LogVisitDialogState extends State<LogVisitDialog> {
   final _studiedController = TextEditingController();
   final _drinkController = TextEditingController();
 
   bool _saving = false;
   String? _error;
+  bool _showCelebration = false;
 
   @override
   void dispose() {
@@ -57,7 +76,8 @@ class _LogVisitSheetState extends State<LogVisitSheet> {
       );
 
       if (!mounted) return;
-      Navigator.of(context).pop(true);
+      // The celebration card pops the dialog itself once it's played out.
+      setState(() => _showCelebration = true);
     } on ApiException catch (e) {
       if (!mounted) return;
       setState(() {
@@ -74,85 +94,116 @@ class _LogVisitSheetState extends State<LogVisitSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-      child: Container(
-        decoration: const BoxDecoration(
-          color: Tone.bg,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        child: SafeArea(
-          top: false,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(22, 12, 22, 22),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: Tone.line,
-                      borderRadius: BorderRadius.circular(4),
+    return AnimatedPadding(
+      duration: const Duration(milliseconds: 180),
+      padding: MediaQuery.of(context).viewInsets +
+          const EdgeInsets.symmetric(horizontal: 28, vertical: 28),
+      child: Center(
+        child: SingleChildScrollView(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 380),
+            child: Material(
+              color: Colors.transparent,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Tone.bg,
+                  borderRadius: BorderRadius.circular(24),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.2),
+                      blurRadius: 30,
+                      offset: const Offset(0, 14),
                     ),
-                  ),
+                  ],
                 ),
-                const SizedBox(height: 20),
-                Text(
-                  'Log a visit',
-                  style: GoogleFonts.fraunces(fontSize: 21, fontWeight: FontWeight.w800, color: Tone.ink),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  widget.spotName,
-                  style: GoogleFonts.fraunces(fontSize: 13.5, fontWeight: FontWeight.w600, color: Tone.muted),
-                ),
-                const SizedBox(height: 22),
-                _sectionLabel('WHAT DID YOU STUDY?'),
-                const SizedBox(height: 8),
-                _field(controller: _studiedController, hint: 'Organic chemistry'),
-                const SizedBox(height: 16),
-                _sectionLabel('WHAT DID YOU ORDER?'),
-                const SizedBox(height: 8),
-                _field(controller: _drinkController, hint: 'Vanilla latte'),
-                if (_error != null) ...[
-                  const SizedBox(height: 16),
-                  _errorBox(_error!),
-                ],
-                const SizedBox(height: 20),
-                SizedBox(
-                  width: double.infinity,
-                  child: GestureDetector(
-                    onTap: _saving ? null : _save,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 15),
-                      decoration: BoxDecoration(color: Tone.ink, borderRadius: BorderRadius.circular(14)),
-                      child: Center(
-                        child: _saving
-                            ? const SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                              )
-                            : Text(
-                                'Log visit',
-                                style: GoogleFonts.fraunces(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w700,
-                                  color: Colors.white,
-                                ),
-                              ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
+                padding: const EdgeInsets.fromLTRB(24, 22, 24, 22),
+                child: _showCelebration ? _buildCelebration() : _buildForm(),
+              ),
             ),
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildCelebration() {
+    return VisitLoggedCard(
+      spotName: widget.spotName,
+      onDone: () => Navigator.of(context).pop(true),
+    );
+  }
+
+  Widget _buildForm() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                'Log a visit',
+                style: GoogleFonts.fraunces(
+                  fontSize: 21,
+                  fontWeight: FontWeight.w800,
+                  color: Tone.ink,
+                ),
+              ),
+            ),
+            GestureDetector(
+              onTap: () => Navigator.of(context).pop(false),
+              child: const Padding(
+                padding: EdgeInsets.all(4),
+                child: Icon(Icons.close, color: Tone.muted, size: 22),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 2),
+        Text(
+          widget.spotName,
+          style: GoogleFonts.fraunces(fontSize: 13.5, fontWeight: FontWeight.w600, color: Tone.muted),
+        ),
+        const SizedBox(height: 22),
+        _sectionLabel('WHAT DID YOU STUDY?'),
+        const SizedBox(height: 8),
+        _bigField(),
+        const SizedBox(height: 18),
+        _sectionLabel('WHAT DID YOU ORDER?'),
+        const SizedBox(height: 8),
+        _smallField(),
+        if (_error != null) ...[
+          const SizedBox(height: 16),
+          _errorBox(_error!),
+        ],
+        const SizedBox(height: 22),
+        SizedBox(
+          width: double.infinity,
+          child: GestureDetector(
+            onTap: _saving ? null : _save,
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 15),
+              decoration: BoxDecoration(color: Tone.ink, borderRadius: BorderRadius.circular(14)),
+              child: Center(
+                child: _saving
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : Text(
+                        'Log visit',
+                        style: GoogleFonts.fraunces(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                      ),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -166,15 +217,44 @@ class _LogVisitSheetState extends State<LogVisitSheet> {
         ),
       );
 
-  Widget _field({required TextEditingController controller, required String hint}) {
+  // The primary write space — sized and weighted like the thing you actually
+  // came here to say, not just another form field.
+  Widget _bigField() {
+    return Container(
+      decoration: BoxDecoration(color: Tone.field, borderRadius: BorderRadius.circular(16)),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      child: TextField(
+        controller: _studiedController,
+        minLines: 3,
+        maxLines: 6,
+        maxLength: _studiedMaxLength,
+        decoration: InputDecoration(
+          border: InputBorder.none,
+          counterText: '',
+          hintText: 'Organic chemistry, chapter 4 problem set...',
+          hintStyle: GoogleFonts.fraunces(
+            fontSize: 16.5,
+            fontWeight: FontWeight.w500,
+            color: Tone.muted,
+            height: 1.4,
+          ),
+        ),
+        style: GoogleFonts.fraunces(fontSize: 16.5, fontWeight: FontWeight.w600, color: Tone.ink, height: 1.4),
+      ),
+    );
+  }
+
+  Widget _smallField() {
     return Container(
       decoration: BoxDecoration(color: Tone.field, borderRadius: BorderRadius.circular(14)),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
       child: TextField(
-        controller: controller,
+        controller: _drinkController,
+        maxLength: _drinkMaxLength,
         decoration: InputDecoration(
           border: InputBorder.none,
-          hintText: hint,
+          counterText: '',
+          hintText: 'Vanilla latte',
           hintStyle: GoogleFonts.fraunces(fontSize: 14.5, fontWeight: FontWeight.w500, color: Tone.muted),
         ),
         style: GoogleFonts.fraunces(fontSize: 14.5, fontWeight: FontWeight.w600, color: Tone.ink),

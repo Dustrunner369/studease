@@ -1,5 +1,6 @@
 /// One "I'm studying here today" log entry — separate from [SpotEntry]: unlimited per
-/// spot, immutable once created, carries no rating. See context/data-model.md D12.
+/// spot, never edited once created, carries no rating. Deletable (via api_service's
+/// deleteVisit) to undo a mislog. See context/data-model.md D12.
 class Visit {
   final String id;
   final String spotId;
