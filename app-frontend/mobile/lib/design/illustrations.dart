@@ -226,6 +226,21 @@ class AvatarIconSketch extends StatelessWidget {
   }
 }
 
+/// Resolves the icon color and circle background for an avatar from its stored
+/// color slug + tint flag — shared by the profile page and the Spots page header
+/// so both render identically. Falls back to Tone.ink/Tone.field when no color
+/// has been picked yet.
+({Color icon, Color background}) resolveAvatarTone({
+  required String? colorSlug,
+  required bool backgroundTint,
+}) {
+  final accent = avatarColorFor(colorSlug);
+  return (
+    icon: accent ?? Tone.ink,
+    background: (accent != null && backgroundTint) ? avatarBackgroundTint(accent) : Tone.field,
+  );
+}
+
 class ConfusedCatSketch extends StatelessWidget {
   final double size;
   final Color color;

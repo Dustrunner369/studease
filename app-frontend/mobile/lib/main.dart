@@ -502,26 +502,51 @@ class _SpotsPageState extends State<SpotsPage> {
     ];
   }
   
-  Widget _buildHeader(int? count) {    
+  Widget _buildHeader(int? count) {
     final countLabel = switch (count) {
-      null => '',      
+      null => '',
       1 => '1 spot',
       _ => '$count spots',
     };
 
+    final me = widget.auth.me;
+    final title = me == null ? 'Spots' : "${me.firstName}'s Spots";
+    final tone = resolveAvatarTone(
+      colorSlug: me?.avatarColor,
+      backgroundTint: me?.avatarBackgroundTint ?? false,
+    );
+
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
+        CircleAvatar(
+          radius: 28,
+          backgroundColor: tone.background,
+          child: me?.avatarId != null
+              ? AvatarIconSketch(
+                  avatarId: me!.avatarId!,
+                  size: me.avatarId == 'cafe_01' ? 56 : 45,
+                  color: tone.icon,
+                )
+              : Text(
+                  (me?.displayName.isNotEmpty ?? false) ? me!.displayName[0].toUpperCase() : '?',
+                  style: GoogleFonts.fraunces(fontSize: 22, fontWeight: FontWeight.w800, color: tone.icon),
+                ),
+        ),
+        const SizedBox(width: 12),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Spots',
+                title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
                 style: GoogleFonts.fraunces(
                   fontSize: 30,
                   fontWeight: FontWeight.w800,
                   letterSpacing: -0.5,
+                  height: 1.15,
                   color: Tone.ink,
                 ),
               ),

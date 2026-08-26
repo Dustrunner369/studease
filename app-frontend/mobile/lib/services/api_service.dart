@@ -83,13 +83,20 @@ Future<Me> registerMe({required String handle, required String displayName}) asy
   return Me.fromJson(data as Map<String, dynamic>);
 }
 
-/// Sets my preset profile icon. [avatarId] must be one of design/illustrations.dart's
-/// avatarIconIds or the server 400s.
-Future<Me> setAvatar(String avatarId) async {
+/// Sets my preset profile icon, accent color, and whether the background is tinted
+/// to match. [avatarId] must be one of design/illustrations.dart's avatarIconIds, or
+/// null to revert to the display-name-initial fallback; [colorSlug] must be one of
+/// design/theme.dart's avatarColorPalette slugs or null — the server 400s otherwise
+/// either way.
+Future<Me> setAvatar(String? avatarId, {String? colorSlug, bool backgroundTint = false}) async {
   final data = await _send((headers) => http.put(
         Uri.parse('$baseUrl/me/avatar'),
         headers: headers,
-        body: json.encode({'avatarId': avatarId}),
+        body: json.encode({
+          'avatarId': avatarId,
+          'avatarColor': colorSlug,
+          'avatarBackgroundTint': backgroundTint,
+        }),
       ));
 
   return Me.fromJson(data as Map<String, dynamic>);

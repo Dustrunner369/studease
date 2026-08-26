@@ -12,6 +12,12 @@ class Me {
   // One of design/illustrations.dart's avatarIconIds, or null before the user has
   // picked one — the profile page falls back to displayName's first letter then.
   final String? avatarId;
+  // A slug from design/theme.dart's avatarColorPalette, or null before the user has
+  // picked one — rendering falls back to Tone.ink then.
+  final String? avatarColor;
+  // Whether the avatar circle's background is also tinted by avatarColor. Meaningless
+  // while avatarColor is null.
+  final bool avatarBackgroundTint;
 
   const Me({
     required this.id,
@@ -20,7 +26,12 @@ class Me {
     required this.isGuest,
     required this.entryCount,
     this.avatarId,
+    this.avatarColor,
+    this.avatarBackgroundTint = false,
   });
+
+  // displayName isn't split into first/last server-side, so derive it here.
+  String get firstName => displayName.split(' ').first;
 
   factory Me.fromJson(Map<String, dynamic> json) => Me(
         id: json['id'] as String,
@@ -29,5 +40,7 @@ class Me {
         isGuest: json['isGuest'] as bool,
         entryCount: (json['entryCount'] as num).toInt(),
         avatarId: json['avatarId'] as String?,
+        avatarColor: json['avatarColor'] as String?,
+        avatarBackgroundTint: json['avatarBackgroundTint'] as bool? ?? false,
       );
 }

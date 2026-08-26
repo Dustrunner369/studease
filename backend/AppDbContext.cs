@@ -26,6 +26,7 @@ namespace study_spot_backend
                 entity.Property(u => u.Handle).HasMaxLength(30);
                 entity.Property(u => u.IsGuest).HasDefaultValue(false);
                 entity.Property(u => u.IsAdmin).HasDefaultValue(false);
+                entity.Property(u => u.AvatarBackgroundTint).HasDefaultValue(false);
 
                 entity.ToTable(t =>
                 {
@@ -37,6 +38,9 @@ namespace study_spot_backend
                     t.HasCheckConstraint("ck_users_avatar_id_valid",
                         "avatar_id IN ('cafe_01', 'cafe_02', 'cafe_03', 'cafe_04', 'cafe_05', " +
                         "'cafe_06', 'cafe_07', 'cafe_08', 'cafe_09', 'cafe_10') OR avatar_id IS NULL");
+                    t.HasCheckConstraint("ck_users_avatar_color_valid",
+                        "avatar_color IN ('terracotta', 'slate', 'sage', 'plum', 'cranberry', " +
+                        "'mustard', 'forest', 'denim') OR avatar_color IS NULL");
                 });
 
                 entity.HasData(new User

@@ -40,6 +40,43 @@ abstract final class Tone {
   static const error = Color(0xFF9B4A2C);
 }
 
+// ---------------------------------------------------------------------------
+// Avatar accent colors — a curated palette a user's avatar icon (and optionally
+// its circle background) can be tinted with. Three reuse Tone's own accent trio
+// so a "sage" avatar matches the sage seen elsewhere; the rest extend the same
+// muted "vintage general store" register rather than a saturated rainbow.
+// ---------------------------------------------------------------------------
+
+class AvatarColor {
+  final String slug;
+  final String label;
+  final Color value;
+  const AvatarColor(this.slug, this.label, this.value);
+}
+
+const List<AvatarColor> avatarColorPalette = [
+  AvatarColor('terracotta', 'Terracotta', Tone.terracotta),
+  AvatarColor('slate', 'Slate', Tone.slate),
+  AvatarColor('sage', 'Sage', Tone.sage),
+  AvatarColor('plum', 'Plum', Color(0xFF7A5568)),
+  AvatarColor('cranberry', 'Cranberry', Color(0xFF8B3A42)),
+  AvatarColor('mustard', 'Mustard', Color(0xFFC99A3C)),
+  AvatarColor('forest', 'Forest', Color(0xFF4F6B4A)),
+  AvatarColor('denim', 'Denim', Color(0xFF4A6670)),
+];
+
+Color? avatarColorFor(String? slug) {
+  for (final c in avatarColorPalette) {
+    if (c.slug == slug) return c.value;
+  }
+  return null;
+}
+
+/// A light, cream-forward tint derived from an accent — mostly Tone.bg with a
+/// wash of the accent, so a tinted avatar background still reads as the app's
+/// warm paper rather than a saturated sticker.
+Color avatarBackgroundTint(Color accent) => Color.lerp(Tone.bg, accent, 0.22)!;
+
 Color scoreColor(double s) {
   if (s >= 9.0) return Tone.sage;
   if (s >= 8.0) return const Color(0xFF9BA37A); // lighter sage

@@ -4,7 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:mobile/design/illustrations.dart';
 import 'package:mobile/design/theme.dart';
 import 'package:mobile/features/authentication/presentation/choose_handle_page.dart';
-import 'package:mobile/features/profile/presentation/avatar_picker_page.dart';
+import 'package:mobile/features/profile/presentation/avatar_picker_sheet.dart';
 import 'package:mobile/features/authentication/presentation/login_page.dart';
 import 'package:mobile/features/study_spots/presentation/past_visits_sheet.dart' show formatVisitDate;
 import 'package:mobile/main.dart';
@@ -201,11 +201,21 @@ class _AccountCard extends StatelessWidget {
   }
 
   Future<void> _pickAvatar(BuildContext context) async {
-    final avatarId = await showAvatarPickerPage(context, selectedAvatarId: me.avatarId);
-    if (avatarId == null || !context.mounted) return;
+    final selection = await showAvatarPickerSheet(
+      context,
+      displayName: me.displayName,
+      selectedAvatarId: me.avatarId,
+      selectedColorSlug: me.avatarColor,
+      selectedBackgroundTint: me.avatarBackgroundTint,
+    );
+    if (selection == null || !context.mounted) return;
 
     try {
-      await auth.updateAvatar(avatarId);
+      await auth.updateAvatar(
+        selection.avatarId,
+        colorSlug: selection.colorSlug,
+        backgroundTint: selection.backgroundTint,
+      );
     } on ApiException catch (e) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -222,6 +232,8 @@ class _AccountCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tone = resolveAvatarTone(colorSlug: me.avatarColor, backgroundTint: me.avatarBackgroundTint);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
@@ -232,17 +244,18 @@ class _AccountCard extends StatelessWidget {
             children: [
               CircleAvatar(
                 radius: 40,
-                backgroundColor: Tone.field,
+                backgroundColor: tone.background,
                 // cafe_01 draws its own circular frame, so it fills the CircleAvatar
                 // edge-to-edge; the others get a small margin so they don't crowd it.
                 child: me.avatarId != null
                     ? AvatarIconSketch(
                         avatarId: me.avatarId!,
                         size: me.avatarId == 'cafe_01' ? 80 : 64,
+                        color: tone.icon,
                       )
                     : Text(
                         me.displayName.isNotEmpty ? me.displayName[0].toUpperCase() : '?',
-                        style: GoogleFonts.fraunces(fontSize: 28, fontWeight: FontWeight.w800, color: Tone.ink),
+                        style: GoogleFonts.fraunces(fontSize: 28, fontWeight: FontWeight.w800, color: tone.icon),
                       ),
               ),
               Container(

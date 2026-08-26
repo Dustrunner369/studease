@@ -2,6 +2,8 @@ namespace study_spot_backend.Models;
 
 // The preset profile-icon set (assets/illustrations/pfpIcons in the client). Fixed and
 // small on purpose - free-form upload is a separate, later feature (see User.AvatarId).
+// Null is a valid value here too - it means "no preset icon", i.e. the client falls
+// back to the display-name initial.
 public static class AvatarIds
 {
     public const string Cafe01 = "cafe_01";
@@ -18,7 +20,26 @@ public static class AvatarIds
     public static readonly string[] All =
         [Cafe01, Cafe02, Cafe03, Cafe04, Cafe05, Cafe06, Cafe07, Cafe08, Cafe09, Cafe10];
 
-    public static bool IsValid(string? value) => value is not null && All.Contains(value);
+    public static bool IsValid(string? value) => value is null || All.Contains(value);
+}
+
+// A curated accent-color set the avatar icon (and optionally its background) can be
+// tinted with. Unlike AvatarIds, null is valid — a color is optional.
+public static class AvatarColors
+{
+    public const string Terracotta = "terracotta";
+    public const string Slate = "slate";
+    public const string Sage = "sage";
+    public const string Plum = "plum";
+    public const string Cranberry = "cranberry";
+    public const string Mustard = "mustard";
+    public const string Forest = "forest";
+    public const string Denim = "denim";
+
+    public static readonly string[] All =
+        [Terracotta, Slate, Sage, Plum, Cranberry, Mustard, Forest, Denim];
+
+    public static bool IsValid(string? value) => value is null || All.Contains(value);
 }
 
 // A person. Identity comes from an external provider — no passwords are stored here.
@@ -42,6 +63,14 @@ public class User : ITimestamped
     // uploaded photo should populate AvatarUrl and this should be cleared - clients
     // prefer AvatarUrl over AvatarId when both are somehow set.
     public string? AvatarId { get; set; }
+
+    // A slug from AvatarColors, null until the user picks one — the client renders its
+    // own default ink color while this is null.
+    public string? AvatarColor { get; set; }
+
+    // Whether the avatar circle's background is also tinted by AvatarColor, vs. just
+    // the icon. Meaningless while AvatarColor is null.
+    public bool AvatarBackgroundTint { get; set; }
 
     public string? AvatarUrl { get; set; }
     public string? Bio { get; set; }

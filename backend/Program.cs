@@ -185,7 +185,8 @@ api.MapGet("/me", async (CurrentUser currentUser, AppDbContext db, CancellationT
 
     var entryCount = await db.SpotEntries.CountAsync(e => e.UserId == user.Id, ct);
 
-    return Results.Ok(new MeDto(user.Id, user.Handle, user.DisplayName, user.IsGuest, entryCount, user.AvatarId));
+    return Results.Ok(new MeDto(user.Id, user.Handle, user.DisplayName, user.IsGuest, entryCount,
+        user.AvatarId, user.AvatarColor, user.AvatarBackgroundTint));
 });
 
 // Completes registration. Works whether this identity is brand new, or a guest
@@ -241,7 +242,8 @@ api.MapPost("/me", async (RegisterRequest request, CurrentUser currentUser, AppD
         db.Users.Add(created);
         await db.SaveChangesAsync(ct);
 
-        return Results.Created("/me", new MeDto(created.Id, created.Handle, created.DisplayName, false, 0, created.AvatarId));
+        return Results.Created("/me", new MeDto(created.Id, created.Handle, created.DisplayName, false, 0,
+            created.AvatarId, created.AvatarColor, created.AvatarBackgroundTint));
     }
 
     existing.Handle = handle;
@@ -253,12 +255,14 @@ api.MapPost("/me", async (RegisterRequest request, CurrentUser currentUser, AppD
 
     var entryCount = await db.SpotEntries.CountAsync(e => e.UserId == existing.Id, ct);
 
-    return Results.Ok(new MeDto(existing.Id, existing.Handle, existing.DisplayName, false, entryCount, existing.AvatarId));
+    return Results.Ok(new MeDto(existing.Id, existing.Handle, existing.DisplayName, false, entryCount,
+        existing.AvatarId, existing.AvatarColor, existing.AvatarBackgroundTint));
 });
 
-// Sets the caller's preset profile icon - the only piece of Me that's mutable outside
-// registration. A plain 400 (not ValidationProblem) since there's exactly one field and
-// "must be one of the preset icons" doesn't need the errors-dictionary shape.
+// Sets the caller's preset profile icon, accent color, and background-tint flag - the
+// only pieces of Me that are mutable outside registration. AvatarId null reverts to the
+// display-name-initial fallback. A plain 400 (not ValidationProblem) since these are
+// simple enum-like fields, not a form.
 registered.MapPut("/me/avatar", async (
     UpdateAvatarRequest request, CurrentUser currentUser, AppDbContext db, CancellationToken ct) =>
 {
@@ -270,13 +274,24 @@ registered.MapPut("/me/avatar", async (
             statusCode: StatusCodes.Status400BadRequest);
     }
 
+    if (!AvatarColors.IsValid(request.AvatarColor))
+    {
+        return Results.Problem(
+            title: "Invalid avatar color",
+            detail: "avatarColor must be one of the preset accent colors, or omitted.",
+            statusCode: StatusCodes.Status400BadRequest);
+    }
+
     var user = await currentUser.GetAsync(ct);
     user!.AvatarId = request.AvatarId;
+    user.AvatarColor = request.AvatarColor;
+    user.AvatarBackgroundTint = request.AvatarBackgroundTint;
     await db.SaveChangesAsync(ct);
 
     var entryCount = await db.SpotEntries.CountAsync(e => e.UserId == user.Id, ct);
 
-    return Results.Ok(new MeDto(user.Id, user.Handle, user.DisplayName, user.IsGuest, entryCount, user.AvatarId));
+    return Results.Ok(new MeDto(user.Id, user.Handle, user.DisplayName, user.IsGuest, entryCount,
+        user.AvatarId, user.AvatarColor, user.AvatarBackgroundTint));
 });
 
 // ---------------------------------------------------------------------------

@@ -63,10 +63,12 @@ class AuthController extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Sets the signed-in user's preset profile icon. Not offered to guests — the picker
-  // only appears on _AccountCard, which _GuestPrompt is shown instead of.
-  Future<void> updateAvatar(String avatarId) async {
-    me = await setAvatar(avatarId);
+  // Sets the signed-in user's preset profile icon, accent color, and background-tint
+  // flag. avatarId null reverts to the display-name-initial fallback. Not offered to
+  // guests — the picker only appears on _AccountCard, which _GuestPrompt is shown
+  // instead of.
+  Future<void> updateAvatar(String? avatarId, {String? colorSlug, bool backgroundTint = false}) async {
+    me = await setAvatar(avatarId, colorSlug: colorSlug, backgroundTint: backgroundTint);
     notifyListeners();
   }
 
