@@ -5,6 +5,7 @@ import 'package:mobile/design/illustrations.dart';
 import 'package:mobile/design/theme.dart';
 import 'package:mobile/features/authentication/presentation/choose_handle_page.dart';
 import 'package:mobile/features/profile/presentation/avatar_picker_sheet.dart';
+import 'package:mobile/features/profile/presentation/settings_drawer.dart';
 import 'package:mobile/features/authentication/presentation/login_page.dart';
 import 'package:mobile/features/study_spots/presentation/past_visits_sheet.dart' show formatVisitDate;
 import 'package:mobile/main.dart';
@@ -20,7 +21,14 @@ class ProfilePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Not reactive to auth.me changing after this build (e.g. a guest finishing
+    // setup) — matches _StudyHistorySection's assumption that ProfilePage is
+    // rebuilt from scratch on every tab switch (CleanBottomNav.pushReplacement,
+    // no IndexedStack), so a stale value here only lasts until the next visit.
+    final isSignedIn = auth.me != null && !auth.me!.isGuest;
+
     return Scaffold(
+      endDrawer: isSignedIn ? SettingsDrawer(auth: auth) : null,
       body: SafeArea(
         // Reactive rather than read-once: signing in from here, or from the guest-limit
         // dialog on the Spots tab and then navigating back, both change auth.me without
@@ -36,14 +44,26 @@ class ProfilePage extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Profile',
-                    style: GoogleFonts.fraunces(
-                      fontSize: 30,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -0.5,
-                      color: Tone.ink,
-                    ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Profile',
+                          style: GoogleFonts.fraunces(
+                            fontSize: 30,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.5,
+                            color: Tone.ink,
+                          ),
+                        ),
+                      ),
+                      if (!me.isGuest)
+                        IconButton(
+                          onPressed: () => Scaffold.of(context).openEndDrawer(),
+                          icon: const Icon(Icons.menu, color: Tone.ink),
+                          splashRadius: 20,
+                        ),
+                    ],
                   ),
                   const SizedBox(height: 20),
                   if (!me.isGuest)
@@ -191,15 +211,6 @@ class _AccountCard extends StatelessWidget {
 
   const _AccountCard({required this.auth, required this.me});
 
-  Future<void> _signOut(BuildContext context) async {
-    await auth.signOut();
-    if (!context.mounted) return;
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (_) => SpotsPage(auth: auth)),
-      (route) => false,
-    );
-  }
-
   Future<void> _pickAvatar(BuildContext context) async {
     final selection = await showAvatarPickerSheet(
       context,
@@ -304,27 +315,6 @@ class _AccountCard extends StatelessWidget {
         ),
         const SizedBox(height: 40),
         const _StudyHistorySection(),
-        const SizedBox(height: 32),
-        SizedBox(
-          width: double.infinity,
-          child: GestureDetector(
-            onTap: () => _signOut(context),
-            child: Container(
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              decoration: BoxDecoration(
-                color: Tone.bg,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: Tone.line, width: 1.5),
-              ),
-              child: Center(
-                child: Text(
-                  'Sign out',
-                  style: GoogleFonts.fraunces(fontSize: 14.5, fontWeight: FontWeight.w700, color: Tone.error),
-                ),
-              ),
-            ),
-          ),
-        ),
       ],
     );
   }
@@ -450,7 +440,7 @@ class _VisitHistoryRow extends StatelessWidget {
           ),
           const SizedBox(width: 10),
           Text(
-            formatVisitDate(visit.visitedAt),
+            formatVisitDate(visit.visitedAt, includeYear: true),
             style: GoogleFonts.fraunces(fontSize: 12.5, fontWeight: FontWeight.w700, color: Tone.terracotta),
           ),
         ],

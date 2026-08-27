@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io' show Platform;
+import 'dart:math' as math;
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -260,11 +261,6 @@ class _SpotsPageState extends State<SpotsPage> {
     }
   }
 
-  Future<void> _addSpot() async {
-    final saved = await showAddSpotSheet(context, widget.auth);
-    if (saved == true && mounted) await _load();
-  }
-
   Future<void> _deleteSpot(MySpotListItem spot) async {
     // Drop it from the list first: a Dismissible has to leave the tree as soon as
     // it's dismissed, and the undo below puts it back if asked.
@@ -415,16 +411,7 @@ class _SpotsPageState extends State<SpotsPage> {
           ),
         ),
       ),
-      floatingActionButton: PressScale(
-        onTap: _addSpot,
-        child: Container(
-          width: 56,
-          height: 56,
-          decoration: const BoxDecoration(color: Tone.terracotta, shape: BoxShape.circle),
-          child: const Icon(Icons.add, color: Colors.white),
-        ),
-      ),
-      bottomNavigationBar: CleanBottomNav(currentIndex: 0, auth: widget.auth),
+      bottomNavigationBar: CleanBottomNav(currentIndex: 0, auth: widget.auth, onSpotSaved: _load),
     );
   }
 
@@ -1415,10 +1402,20 @@ class _SheetButton extends StatelessWidget {
 /// go_router or lifting SpotsPage's FAB/list state up into a shell; see
 /// context/auth-plan.md on deferring routing changes.
 class CleanBottomNav extends StatelessWidget {
+  static const double _buttonSize = 60;
+  // How far the add button pokes above the bar's top edge, Venmo-style.
+  static const double _overlap = 22;
+  // Breathing room between the notch curve and the button's own ring.
+  static const double _notchGap = 6;
+
   final int currentIndex;
   final AuthController auth;
 
-  const CleanBottomNav({super.key, required this.currentIndex, required this.auth});
+  /// Called after a spot is saved from the add-button sheet, so the Spots tab can
+  /// refresh its list in place. Left null on tabs with no list to refresh.
+  final VoidCallback? onSpotSaved;
+
+  const CleanBottomNav({super.key, required this.currentIndex, required this.auth, this.onSpotSaved});
 
   void _select(BuildContext context, int index) {
     if (index == currentIndex) return;
@@ -1431,31 +1428,78 @@ class CleanBottomNav extends StatelessWidget {
     Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => page));
   }
 
+  Future<void> _addSpot(BuildContext context) async {
+    final saved = await showAddSpotSheet(context, auth);
+    if (saved == true) onSpotSaved?.call();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(
-        color: Tone.bg,
-        border: Border(top: BorderSide(color: Tone.line, width: 1)),
-      ),
+      color: Tone.bg,
       child: SafeArea(
         top: false,
         child: SizedBox(
           height: 60,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          child: Stack(
+            clipBehavior: Clip.none,
+            alignment: Alignment.center,
             children: [
-              _NavItem(
-                icon: Icons.place,
-                label: 'Spots',
-                active: currentIndex == 0,
-                onTap: () => _select(context, 0),
+              Positioned.fill(
+                child: CustomPaint(
+                  painter: _NotchedTopBorderPainter(
+                    buttonCenterY: -_overlap + _buttonSize / 2,
+                    notchRadius: _buttonSize / 2 + _notchGap,
+                  ),
+                ),
               ),
-              _NavItem(
-                icon: Icons.person_outline,
-                label: 'Profile',
-                active: currentIndex == 1,
-                onTap: () => _select(context, 1),
+              Row(
+                children: [
+                  Expanded(
+                    child: Center(
+                      child: _NavItem(
+                        icon: Icons.place,
+                        label: 'Spots',
+                        active: currentIndex == 0,
+                        onTap: () => _select(context, 0),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: _buttonSize + 16),
+                  Expanded(
+                    child: Center(
+                      child: _NavItem(
+                        icon: Icons.person_outline,
+                        label: 'Profile',
+                        active: currentIndex == 1,
+                        onTap: () => _select(context, 1),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              Positioned(
+                top: -_overlap,
+                child: PressScale(
+                  onTap: () => _addSpot(context),
+                  child: Container(
+                    width: _buttonSize,
+                    height: _buttonSize,
+                    decoration: BoxDecoration(
+                      color: Tone.terracotta,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Tone.bg, width: 4),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.18),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(Icons.add, color: Colors.white, size: 26),
+                  ),
+                ),
               ),
             ],
           ),
@@ -1463,6 +1507,66 @@ class CleanBottomNav extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Traces the bar's top edge with a smooth notch curving around the add
+/// button's bottom, rather than a flat line the button just sits on top of —
+/// same geometry Material's CircularNotchedRectangle uses to dock a FAB into
+/// a BottomAppBar, reused here as an open stroke instead of a filled shape.
+class _NotchedTopBorderPainter extends CustomPainter {
+  final double buttonCenterY;
+  final double notchRadius;
+
+  const _NotchedTopBorderPainter({required this.buttonCenterY, required this.notchRadius});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final r = notchRadius;
+    const s1 = 15.0;
+    const s2 = 1.0;
+    final a = -r - s2;
+    final b = -buttonCenterY; // host.top (0) - guest.center.dy
+
+    final n2 = math.sqrt(b * b * r * r * (a * a + b * b - r * r));
+    final p2xA = ((a * r * r) - n2) / (a * a + b * b);
+    final p2xB = ((a * r * r) + n2) / (a * a + b * b);
+    final p2yA = math.sqrt(r * r - p2xA * p2xA);
+    final p2yB = math.sqrt(r * r - p2xB * p2xB);
+
+    final p = List<Offset>.filled(6, Offset.zero);
+    p[0] = Offset(a - s1, b);
+    p[1] = Offset(a, b);
+    final cmp = b < 0 ? -1.0 : 1.0;
+    p[2] = cmp * p2yA > cmp * p2yB ? Offset(p2xA, p2yA) : Offset(p2xB, p2yB);
+    p[3] = Offset(-p[2].dx, p[2].dy);
+    p[4] = Offset(-p[1].dx, p[1].dy);
+    p[5] = Offset(-p[0].dx, p[0].dy);
+
+    final guestCenter = Offset(size.width / 2, buttonCenterY);
+    for (var i = 0; i < p.length; i++) {
+      p[i] += guestCenter;
+    }
+
+    final path = Path()
+      ..moveTo(0, 0)
+      ..lineTo(p[0].dx, p[0].dy)
+      ..quadraticBezierTo(p[1].dx, p[1].dy, p[2].dx, p[2].dy)
+      ..arcToPoint(p[3], radius: Radius.circular(r), clockwise: false)
+      ..quadraticBezierTo(p[4].dx, p[4].dy, p[5].dx, p[5].dy)
+      ..lineTo(size.width, 0);
+
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = Tone.line
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.5,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _NotchedTopBorderPainter oldDelegate) =>
+      oldDelegate.buttonCenterY != buttonCenterY || oldDelegate.notchRadius != notchRadius;
 }
 
 class _NavItem extends StatelessWidget {
