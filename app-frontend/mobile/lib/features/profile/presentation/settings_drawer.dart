@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:mobile/design/theme.dart';
+import 'package:mobile/features/profile/presentation/feedback_page.dart';
+import 'package:mobile/features/profile/presentation/privacy_policy_page.dart';
 import 'package:mobile/main.dart';
 import 'package:mobile/services/auth_controller.dart';
 
@@ -47,6 +49,22 @@ class SettingsDrawer extends StatelessWidget {
                     splashRadius: 20,
                   ),
                 ],
+              ),
+            ),
+            const Divider(height: 1, thickness: 1, color: Tone.line),
+            _SettingsRow(
+              icon: Icons.chat_bubble_outline,
+              label: 'Leave Feedback',
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const FeedbackPage()),
+              ),
+            ),
+            const Divider(height: 1, thickness: 1, color: Tone.line),
+            _SettingsRow(
+              icon: Icons.shield_outlined,
+              label: 'Privacy Policy',
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const PrivacyPolicyPage()),
               ),
             ),
             const Divider(height: 1, thickness: 1, color: Tone.line),

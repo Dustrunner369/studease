@@ -229,6 +229,7 @@ class _SpotsPageState extends State<SpotsPage> {
 
   @override
   void dispose() {
+    _undoEntry?.remove();
     _searchBarController.removeListener(_onSearchChanged);
     super.dispose();
   }
@@ -276,33 +277,39 @@ class _SpotsPageState extends State<SpotsPage> {
     }
 
     if (!mounted) return;
+    // Best-effort: the Profile tab's "N spots rated" reads auth.me.entryCount, which
+    // is only fetched at boot/login otherwise - without this it goes stale the moment
+    // a spot is removed here, even though this list itself is already showing the
+    // post-delete count.
+    unawaited(widget.auth.refreshMe());
     _showUndo(spot);
   }
 
+  OverlayEntry? _undoEntry;
+
   /// Undo re-saves the same ratings. Deleting an entry leaves the spot itself
   /// alone, so this puts the rating back exactly where it was.
+  ///
+  /// A hand-rolled overlay rather than a real SnackBar: Flutter's SnackBar skips
+  /// its own timeout AND its enter/exit animations whenever the platform reports
+  /// accessible navigation is on (VoiceOver, Switch Control, or - as on this
+  /// simulator - just the accessibility bridge being attached at all). That's
+  /// correct for a screen-reader user, but it also meant no animation ever played
+  /// here in dev. Driving the animation ourselves plays it unconditionally.
   void _showUndo(MySpotListItem spot) {
-    ScaffoldMessenger.of(context).hideCurrentSnackBar();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        behavior: SnackBarBehavior.floating,
-        backgroundColor: Tone.ink,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        duration: const Duration(seconds: 5),
-        content: Text(
-          'Removed ${spot.name}',
-          style: GoogleFonts.fraunces(
-            color: Colors.white,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        action: SnackBarAction(
-          label: 'Undo',
-          textColor: Tone.terracotta,
-          onPressed: () => _restore(spot),
-        ),
+    _undoEntry?.remove();
+    final entry = OverlayEntry(
+      builder: (_) => _UndoToast(
+        message: 'Removed ${spot.name}',
+        onUndo: () => _restore(spot),
+        onDismissed: () {
+          _undoEntry?.remove();
+          _undoEntry = null;
+        },
       ),
     );
+    _undoEntry = entry;
+    Overlay.of(context).insert(entry);
   }
 
   Future<void> _restore(MySpotListItem spot) async {
@@ -321,6 +328,7 @@ class _SpotsPageState extends State<SpotsPage> {
     }
 
     if (!mounted) return;
+    unawaited(widget.auth.refreshMe());
     await _load();
   }
 
@@ -847,7 +855,9 @@ class SpotRow extends StatelessWidget {
                   ),
                   if (spot.tags.isNotEmpty) ...[
                     const SizedBox(height: 6),
-                    _TagPills(tags: spot.tags),
+                    // Scrollable, not wrapping: a spot with ten tags would otherwise push
+                    // this row's height out with a second or third line of pills.
+                    _TagPills(tags: spot.tags, scrollable: true),
                   ],
                 ],
               ),
@@ -867,34 +877,48 @@ class SpotRow extends StatelessWidget {
 /// add_spot_sheet.dart. Same visual language, different behavior.
 class _TagPills extends StatelessWidget {
   final List<String> tags;
+  // Row + horizontal scroll instead of Wrap, for a context (SpotRow) where the pills
+  // must not grow the container's height no matter how many tags there are.
+  final bool scrollable;
 
-  const _TagPills({required this.tags});
+  const _TagPills({required this.tags, this.scrollable = false});
 
   @override
   Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 6,
-      runSpacing: 6,
-      children: [
-        for (final tag in tags)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: Tone.field,
-              borderRadius: BorderRadius.circular(999),
-            ),
-            child: Text(
-              '#$tag',
-              style: GoogleFonts.fraunces(
-                fontSize: 11.5,
-                fontWeight: FontWeight.w700,
-                color: Tone.ink,
-              ),
-            ),
-          ),
-      ],
+    final pills = [for (final tag in tags) _pill(tag)];
+
+    if (!scrollable) {
+      return Wrap(spacing: 6, runSpacing: 6, children: pills);
+    }
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          for (var i = 0; i < pills.length; i++) ...[
+            if (i > 0) const SizedBox(width: 6),
+            pills[i],
+          ],
+        ],
+      ),
     );
   }
+
+  Widget _pill(String tag) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: Tone.field,
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Text(
+          '#$tag',
+          style: GoogleFonts.fraunces(
+            fontSize: 11.5,
+            fontWeight: FontWeight.w700,
+            color: Tone.ink,
+          ),
+        ),
+      );
 }
 
 class _ScoreBubble extends StatelessWidget {
@@ -1249,6 +1273,110 @@ class SpotDetailSheet extends StatelessWidget {
   }
 }
 
+/// The "Removed `<spot>` / Undo" toast, as a plain [Overlay] entry with its own
+/// [AnimationController] rather than a real SnackBar — see [_SpotsPageState._showUndo]
+/// for why. Non-modal (no barrier): unlike [_Toast], the rest of the page stays
+/// interactive while this shows.
+class _UndoToast extends StatefulWidget {
+  final String message;
+  final VoidCallback onUndo;
+
+  /// Called once the exit animation finishes, so the caller can remove this from
+  /// its Overlay.
+  final VoidCallback onDismissed;
+
+  const _UndoToast({required this.message, required this.onUndo, required this.onDismissed});
+
+  @override
+  State<_UndoToast> createState() => _UndoToastState();
+}
+
+class _UndoToastState extends State<_UndoToast> with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 220),
+  );
+  Timer? _timer;
+  bool _closing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller.forward();
+    _timer = Timer(const Duration(seconds: 5), _close);
+  }
+
+  Future<void> _close() async {
+    if (_closing) return;
+    _closing = true;
+    _timer?.cancel();
+    await _controller.reverse();
+    if (mounted) widget.onDismissed();
+  }
+
+  void _undo() {
+    widget.onUndo();
+    _close();
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final curved = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeOutCubic,
+      reverseCurve: Curves.easeInCubic,
+    );
+
+    return Positioned(
+      left: 16,
+      right: 16,
+      // Cleared above the bottom nav's raised "+" button, which pokes
+      // CleanBottomNav._overlap above the bar itself.
+      bottom: CleanBottomNav._overlap + 16,
+      child: SlideTransition(
+        position: Tween<Offset>(begin: const Offset(0, 0.4), end: Offset.zero).animate(curved),
+        child: FadeTransition(
+          opacity: curved,
+          child: Material(
+            color: Colors.transparent,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              decoration: BoxDecoration(
+                color: Tone.ink,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      widget.message,
+                      style: GoogleFonts.fraunces(color: Colors.white, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: _undo,
+                    child: Text(
+                      'Undo',
+                      style: GoogleFonts.fraunces(color: Tone.terracotta, fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// A SnackBar-styled toast shown as its own dialog route rather than a real
 /// SnackBar — see [SpotDetailSheet._soon] for why. Auto-dismisses; tapping the
 /// barrier behind it dismisses early.
@@ -1419,6 +1547,12 @@ class CleanBottomNav extends StatelessWidget {
 
   void _select(BuildContext context, int index) {
     if (index == currentIndex) return;
+
+    // pushReplacement tears down the page that may have shown a SnackBar (e.g. the
+    // "Removed <spot> / Undo" toast) while its timed dismissal is still pending, which
+    // leaves it stuck on screen through the tab switch instead of timing out. Remove it
+    // outright (no reverse animation to potentially hang) rather than letting that race.
+    ScaffoldMessenger.of(context).removeCurrentSnackBar();
 
     final page = switch (index) {
       0 => SpotsPage(auth: auth),

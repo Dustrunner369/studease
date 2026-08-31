@@ -9,6 +9,10 @@ namespace study_spot_backend
         // real caller once sign-in exists — see "Still open" in context/README.md.
         public static readonly Guid DevUserId = new("00000000-0000-0000-0000-0000000000d5");
 
+        // Fixed, not DateTime.UtcNow, for the same reason as DevUserId's CreatedAt below -
+        // seed data goes into a migration and must produce the same SQL every time.
+        private static readonly DateTime LabelSeedAt = new(2026, 8, 31, 0, 0, 0, DateTimeKind.Utc);
+
         public DbSet<User> Users => Set<User>();
         public DbSet<Spot> Spots => Set<Spot>();
         public DbSet<SpotEntry> SpotEntries => Set<SpotEntry>();
@@ -118,14 +122,46 @@ namespace study_spot_backend
                 {
                     t.HasCheckConstraint("ck_labels_status_valid",
                         "status IN ('pending', 'approved', 'rejected')");
-                    // Alphanumeric only, no separators - hashtag-shaped to match how
-                    // slugs render as #cozy in the picker/filter chips. A hyphen would
-                    // break that the way #best-for-reading reads as broken elsewhere.
-                    t.HasCheckConstraint("ck_labels_slug_format", "slug ~ '^[a-z0-9]{2,30}$'");
+                    // Kebab-case: lowercase alphanumeric segments joined by single hyphens,
+                    // no leading/trailing/doubled hyphens. Decision D14 (2026-08-31) reversed
+                    // the earlier no-hyphen rule - the #slug pill is plain text, not a real
+                    // hashtag parser, so a hyphen doesn't actually break anything there.
+                    t.HasCheckConstraint("ck_labels_slug_format",
+                        "slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$' AND char_length(slug) BETWEEN 2 AND 30");
                     // Null only while pending/rejected — set exactly once, at approval.
                     t.HasCheckConstraint("ck_labels_polarity_valid",
                         "polarity IS NULL OR polarity IN ('positive', 'negative')");
                 });
+
+                // Starter vocabulary, pre-approved so the picker isn't empty on a fresh
+                // database. ApprovedBy is DevUserId (the seeded admin) - same "who reviewed
+                // this" meaning as a real approval. Fixed ids/timestamp for the same reason
+                // as the dev user seed above: a migration must produce the same SQL every
+                // time it's generated.
+                entity.HasData(
+                    new Label { Id = new Guid("d4408705-2f22-46fe-ac04-2a51431fe90a"), Slug = "cozy", DisplayName = "cozy", Status = LabelStatuses.Approved, Polarity = LabelPolarities.Positive, ApprovedBy = DevUserId, CreatedAt = LabelSeedAt, UpdatedAt = LabelSeedAt },
+                    new Label { Id = new Guid("bd822f70-112e-4635-b43f-cb5409a0622f"), Slug = "industrial", DisplayName = "industrial", Status = LabelStatuses.Approved, Polarity = LabelPolarities.Positive, ApprovedBy = DevUserId, CreatedAt = LabelSeedAt, UpdatedAt = LabelSeedAt },
+                    new Label { Id = new Guid("0f847955-c6d7-4185-aebb-f36d3c0374a5"), Slug = "quiet", DisplayName = "quiet", Status = LabelStatuses.Approved, Polarity = LabelPolarities.Positive, ApprovedBy = DevUserId, CreatedAt = LabelSeedAt, UpdatedAt = LabelSeedAt },
+                    new Label { Id = new Guid("0d0744c6-e6f9-45d0-b30b-27cce17af987"), Slug = "loud", DisplayName = "loud", Status = LabelStatuses.Approved, Polarity = LabelPolarities.Negative, ApprovedBy = DevUserId, CreatedAt = LabelSeedAt, UpdatedAt = LabelSeedAt },
+                    new Label { Id = new Guid("fea67674-9df1-470c-83b9-fd0d5cf8296d"), Slug = "open-late", DisplayName = "open late", Status = LabelStatuses.Approved, Polarity = LabelPolarities.Positive, ApprovedBy = DevUserId, CreatedAt = LabelSeedAt, UpdatedAt = LabelSeedAt },
+                    new Label { Id = new Guid("b98f6021-a30f-4c08-ab59-5a8634095309"), Slug = "dim-lighting", DisplayName = "dim lighting", Status = LabelStatuses.Approved, Polarity = LabelPolarities.Negative, ApprovedBy = DevUserId, CreatedAt = LabelSeedAt, UpdatedAt = LabelSeedAt },
+                    new Label { Id = new Guid("5097f5fc-df27-4fa3-bed1-ddb2dd1f38c9"), Slug = "first-date", DisplayName = "first date", Status = LabelStatuses.Approved, Polarity = LabelPolarities.Positive, ApprovedBy = DevUserId, CreatedAt = LabelSeedAt, UpdatedAt = LabelSeedAt },
+                    new Label { Id = new Guid("f0d157a4-5429-47b1-818c-869a36370fbe"), Slug = "aesthetic", DisplayName = "aesthetic", Status = LabelStatuses.Approved, Polarity = LabelPolarities.Positive, ApprovedBy = DevUserId, CreatedAt = LabelSeedAt, UpdatedAt = LabelSeedAt },
+                    new Label { Id = new Guid("cc9f75a2-8cae-4227-a975-cab5b1286cc0"), Slug = "plants-everywhere", DisplayName = "plants everywhere", Status = LabelStatuses.Approved, Polarity = LabelPolarities.Positive, ApprovedBy = DevUserId, CreatedAt = LabelSeedAt, UpdatedAt = LabelSeedAt },
+                    new Label { Id = new Guid("68c862fd-3683-401f-8b9e-a651f5419fff"), Slug = "great-pour-over", DisplayName = "great pour-over", Status = LabelStatuses.Approved, Polarity = LabelPolarities.Positive, ApprovedBy = DevUserId, CreatedAt = LabelSeedAt, UpdatedAt = LabelSeedAt },
+                    new Label { Id = new Guid("a930da23-d776-4116-aa1e-79c647918b36"), Slug = "great-latte", DisplayName = "great latte", Status = LabelStatuses.Approved, Polarity = LabelPolarities.Positive, ApprovedBy = DevUserId, CreatedAt = LabelSeedAt, UpdatedAt = LabelSeedAt },
+                    new Label { Id = new Guid("74ed637a-9376-458e-b68c-cb5d878adf7f"), Slug = "expensive", DisplayName = "expensive", Status = LabelStatuses.Approved, Polarity = LabelPolarities.Negative, ApprovedBy = DevUserId, CreatedAt = LabelSeedAt, UpdatedAt = LabelSeedAt },
+                    new Label { Id = new Guid("967fded0-094f-479c-ad2e-2e2a70764130"), Slug = "great-matcha", DisplayName = "great matcha", Status = LabelStatuses.Approved, Polarity = LabelPolarities.Positive, ApprovedBy = DevUserId, CreatedAt = LabelSeedAt, UpdatedAt = LabelSeedAt },
+                    new Label { Id = new Guid("45d5905b-0399-41e8-9081-fbd18d2dba23"), Slug = "gluten-free", DisplayName = "gluten-free", Status = LabelStatuses.Approved, Polarity = LabelPolarities.Positive, ApprovedBy = DevUserId, CreatedAt = LabelSeedAt, UpdatedAt = LabelSeedAt },
+                    new Label { Id = new Guid("09c1b8d1-b7fc-45a6-aabc-c6e13968f937"), Slug = "great-smoothies", DisplayName = "great smoothies", Status = LabelStatuses.Approved, Polarity = LabelPolarities.Positive, ApprovedBy = DevUserId, CreatedAt = LabelSeedAt, UpdatedAt = LabelSeedAt },
+                    new Label { Id = new Guid("d2bf3b5b-4c15-4ca5-9bf1-d96cb6eefee9"), Slug = "open-air", DisplayName = "open-air", Status = LabelStatuses.Approved, Polarity = LabelPolarities.Positive, ApprovedBy = DevUserId, CreatedAt = LabelSeedAt, UpdatedAt = LabelSeedAt },
+                    new Label { Id = new Guid("9903b982-5886-4315-a453-3796c07bb3d7"), Slug = "reading-nook", DisplayName = "reading nook", Status = LabelStatuses.Approved, Polarity = LabelPolarities.Positive, ApprovedBy = DevUserId, CreatedAt = LabelSeedAt, UpdatedAt = LabelSeedAt },
+                    new Label { Id = new Guid("f3ef91b9-916e-49d8-a983-bc80c55e4dfb"), Slug = "yummy-pastries", DisplayName = "yummy pastries", Status = LabelStatuses.Approved, Polarity = LabelPolarities.Positive, ApprovedBy = DevUserId, CreatedAt = LabelSeedAt, UpdatedAt = LabelSeedAt },
+                    new Label { Id = new Guid("fd23c2f8-ad32-492b-b8b8-5f3df7082289"), Slug = "always-crowded", DisplayName = "always crowded", Status = LabelStatuses.Approved, Polarity = LabelPolarities.Negative, ApprovedBy = DevUserId, CreatedAt = LabelSeedAt, UpdatedAt = LabelSeedAt },
+                    new Label { Id = new Guid("3da0fb71-01b3-4184-9570-1f2e72335a97"), Slug = "comfy-seating", DisplayName = "comfy seating", Status = LabelStatuses.Approved, Polarity = LabelPolarities.Positive, ApprovedBy = DevUserId, CreatedAt = LabelSeedAt, UpdatedAt = LabelSeedAt },
+                    new Label { Id = new Guid("860eb038-745f-4b6a-af63-bbe204d0b9aa"), Slug = "hard-seating", DisplayName = "hard seating", Status = LabelStatuses.Approved, Polarity = LabelPolarities.Negative, ApprovedBy = DevUserId, CreatedAt = LabelSeedAt, UpdatedAt = LabelSeedAt },
+                    new Label { Id = new Guid("9fcb370f-99e3-4709-ad47-fff5dd68b883"), Slug = "spacious", DisplayName = "spacious", Status = LabelStatuses.Approved, Polarity = LabelPolarities.Positive, ApprovedBy = DevUserId, CreatedAt = LabelSeedAt, UpdatedAt = LabelSeedAt }
+                );
             });
 
             modelBuilder.Entity<SpotTagCount>(entity =>

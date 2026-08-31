@@ -266,6 +266,17 @@ Future<Label> requestLabel(String name) async {
   return Label.fromJson(data as Map<String, dynamic>);
 }
 
+/// Emails the submission straight to the developer - see backend FeedbackMailer.
+/// [type] must be one of FeedbackPage's feedback type slugs ('bug', 'feature_request',
+/// 'other').
+Future<void> submitFeedback({required String type, required String message}) async {
+  await _send((headers) => http.post(
+        Uri.parse('$baseUrl/feedback'),
+        headers: headers,
+        body: json.encode({'type': type, 'message': message}),
+      ));
+}
+
 Future<dynamic> _send(Future<http.Response> Function(Map<String, String> headers) request) async {
   var response = await _attempt(request, forceRefresh: false);
 

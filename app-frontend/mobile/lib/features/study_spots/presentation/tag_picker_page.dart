@@ -114,13 +114,13 @@ class _TagPickerPageState extends State<TagPickerPage> {
           padding: const EdgeInsets.fromLTRB(22, 8, 22, 24),
           children: [
             if (positive.isNotEmpty) ...[
-              _sectionLabel('POSITIVE'),
+              _sectionLabel('Good for:'),
               const SizedBox(height: 10),
               _pillWrap(positive, negative: false),
               const SizedBox(height: 22),
             ],
             if (negative.isNotEmpty) ...[
-              _sectionLabel('NEGATIVE'),
+              _sectionLabel('What was wrong?'),
               const SizedBox(height: 10),
               _pillWrap(negative, negative: true),
               const SizedBox(height: 22),

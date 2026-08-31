@@ -236,11 +236,14 @@ The standardized, global tag vocabulary that replaced `spots.type` (decision D10
 entry; anyone can propose a new one, but it's unusable — by anyone, including whoever
 proposed it — until an admin reviews it.
 
-- `slug` is normalized: **lowercase alphanumeric only, no separators.** "Best for
-  reading" becomes `bestforreading`. This is deliberately not kebab-case — labels are
-  hashtag-shaped (`#cozy`, `#bestforreading`) everywhere they render, and a hyphen
-  breaks that the way `#best-for-reading` reads as broken on every platform that has
-  hashtags. Enforced by `CHECK (slug ~ '^[a-z0-9]{2,30}$')` and a unique index.
+- `slug` is normalized: **lowercase kebab-case.** "Best for reading" becomes
+  `best-for-reading`. Originally alphanumeric-only (no hyphens), on the theory that
+  labels are hashtag-shaped (`#cozy`) everywhere they render and a hyphen breaks that
+  the way `#best-for-reading` reads as broken on real hashtag platforms — reversed by
+  decision D14 (2026-08-31): the `#slug` pill in this app's own picker/filter chips is
+  plain text (`Text('#${slug}')`), not a real hashtag parser, so a hyphen renders fine
+  there. Enforced by `CHECK (slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$' AND char_length(slug)
+  BETWEEN 2 AND 30)` and a unique index.
 - `display_name` is the human-readable form, stored separately since it can't be
   losslessly reconstructed from `slug`. Mainly seen in the moderation queue.
 - `status` is `pending | approved | rejected`. Only `approved` labels appear in the

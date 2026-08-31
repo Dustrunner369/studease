@@ -40,6 +40,7 @@ builder.Services.AddDbContext<AppDbContext>(opt =>
     opt.UseNpgsql(connectionString).UseSnakeCaseNamingConvention());
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 builder.Services.AddHttpClient<PlacesClient>();
+builder.Services.AddSingleton<FeedbackMailer>();
 builder.Services.AddProblemDetails();
 
 // ---------------------------------------------------------------------------
@@ -160,6 +161,54 @@ api.MapGet("/places/search", async (string? q, PlacesClient places, Cancellation
     return Results.Ok(suggestions
         .Select(s => new PlaceSuggestionDto(s.GooglePlaceId, s.Name, s.Address))
         .ToList());
+});
+
+// ---------------------------------------------------------------------------
+// Feedback
+// ---------------------------------------------------------------------------
+
+// Emails the submission straight to the developer's inbox - see FeedbackMailer. No
+// feedback table or admin UI: not worth building for a low-traffic app.
+registered.MapPost("/feedback", async (
+    SubmitFeedbackRequest request, FeedbackMailer mailer, CurrentUser currentUser, CancellationToken ct) =>
+{
+    var message = request.Message?.Trim();
+    var errors = new Dictionary<string, string[]>();
+
+    if (!FeedbackTypes.IsValid(request.Type))
+    {
+        errors["type"] = [$"Type must be one of: {string.Join(", ", FeedbackTypes.All)}."];
+    }
+    if (string.IsNullOrWhiteSpace(message))
+    {
+        errors["message"] = ["Say something before submitting."];
+    }
+    if (errors.Count > 0) return Results.ValidationProblem(errors);
+
+    if (!mailer.IsConfigured)
+    {
+        return Results.Problem(
+            title: "Feedback is not configured",
+            detail: "Set Feedback:SmtpUser, Feedback:SmtpAppPassword and Feedback:RecipientEmail " +
+                    "(or the matching Feedback__* environment variables) to enable the feedback form.",
+            statusCode: StatusCodes.Status503ServiceUnavailable);
+    }
+
+    var user = (await currentUser.GetAsync(ct))!;
+
+    try
+    {
+        await mailer.SendAsync(request.Type!, message!, user.Handle, ct);
+    }
+    catch (Exception)
+    {
+        return Results.Problem(
+            title: "Could not send feedback",
+            detail: "The email failed to send. Try again in a moment.",
+            statusCode: StatusCodes.Status502BadGateway);
+    }
+
+    return Results.NoContent();
 });
 
 // ---------------------------------------------------------------------------
@@ -317,7 +366,8 @@ registered.MapPost("/labels", async (
     var slug = Slugify(request.Name);
     var displayName = request.Name?.Trim();
 
-    if (string.IsNullOrWhiteSpace(displayName) || !Regex.IsMatch(slug, @"^[a-z0-9]{2,30}$"))
+    if (string.IsNullOrWhiteSpace(displayName) || slug.Length is < 2 or > 30 ||
+        !Regex.IsMatch(slug, @"^[a-z0-9]+(-[a-z0-9]+)*$"))
     {
         return Results.ValidationProblem(new Dictionary<string, string[]>
         {
@@ -659,6 +709,24 @@ registered.MapDelete("/spots/{id:guid}/entry", async (
     if (entry is null) return Results.NotFound();
 
     db.SpotEntries.Remove(entry);
+
+    // My visits to this spot only make sense on top of a rating - POST
+    // /spots/{id}/visits requires one to exist before it'll let you log one (see
+    // "Requires an existing SpotEntry" above). Removing the rating without these
+    // would leave them stranded: still visible in "my study history", but for a
+    // spot I no longer have rated, and re-rating later would let you log a fresh
+    // visit right on top of the old ones instead of starting clean.
+    var myVisits = await db.SpotVisits
+        .Where(v => v.SpotId == id && v.UserId == userId)
+        .ToListAsync(ct);
+    db.SpotVisits.RemoveRange(myVisits);
+
+    if (myVisits.Count > 0)
+    {
+        var spot = await db.Spots.FirstOrDefaultAsync(s => s.Id == id, ct);
+        if (spot is not null) spot.VisitCount = Math.Max(0, spot.VisitCount - myVisits.Count);
+    }
+
     await db.SaveChangesAsync(ct);
     await RecomputeAggregates(db, id, ct);
 
@@ -845,14 +913,13 @@ static Dictionary<string, string[]> ValidateHandle(string? handle)
     return errors;
 }
 
-// Lowercase alphanumeric only, no separators - "Best for reading" becomes
-// "bestforreading". Hashtag-shaped on purpose, matching how slugs render as #slug in
-// the picker/filter chips: a hyphen would break that the way #best-for-reading reads
-// as broken on every platform that has hashtags.
+// Lowercase kebab-case - "Best for reading" becomes "best-for-reading". Any run of
+// non-alphanumeric characters (spaces, punctuation, an already-typed hyphen) collapses
+// to a single "-"; leading/trailing hyphens are trimmed.
 static string Slugify(string? name)
 {
     var lowered = (name ?? "").ToLowerInvariant();
-    return new string(lowered.Where(c => c is (>= 'a' and <= 'z') or (>= '0' and <= '9')).ToArray());
+    return Regex.Replace(lowered, "[^a-z0-9]+", "-").Trim('-');
 }
 
 static SpotEntryDto ToEntryDto(SpotEntry entry) => new(

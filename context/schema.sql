@@ -220,10 +220,10 @@ CREATE INDEX spot_visits_spot_user_visited_idx ON spot_visits (spot_id, user_id,
 CREATE TABLE labels (
     id            uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
 
-    -- Lowercase alphanumeric only, no separators — hashtag-shaped ("#cozy",
-    -- "#bestforreading"), deliberately not kebab-case. A hyphen breaks the #slug
-    -- rendering everywhere this shows up, the way #best-for-reading reads as broken
-    -- on every platform that has hashtags. "Best for reading" -> "bestforreading".
+    -- Lowercase kebab-case ("cozy", "best-for-reading"). Decision D14 (2026-08-31)
+    -- reversed the earlier no-hyphen rule — the #slug pill in the picker/filter chips
+    -- is plain text, not a real hashtag parser, so a hyphen renders fine there.
+    -- "Best for reading" -> "best-for-reading".
     slug          text        NOT NULL,
     -- The human-readable form, as typed — can't be losslessly reconstructed from
     -- slug, so stored separately. Mainly seen in the moderation queue.
@@ -247,7 +247,7 @@ CREATE TABLE labels (
     created_at    timestamptz NOT NULL DEFAULT now(),
     updated_at    timestamptz NOT NULL DEFAULT now(),
 
-    CONSTRAINT labels_slug_format    CHECK (slug ~ '^[a-z0-9]{2,30}$'),
+    CONSTRAINT labels_slug_format    CHECK (slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$' AND char_length(slug) BETWEEN 2 AND 30),
     CONSTRAINT labels_status_valid   CHECK (status IN ('pending', 'approved', 'rejected')),
     CONSTRAINT labels_polarity_valid CHECK (polarity IN ('positive', 'negative'))
 );

@@ -7,7 +7,8 @@ import 'package:mobile/features/authentication/presentation/choose_handle_page.d
 import 'package:mobile/features/profile/presentation/avatar_picker_sheet.dart';
 import 'package:mobile/features/profile/presentation/settings_drawer.dart';
 import 'package:mobile/features/authentication/presentation/login_page.dart';
-import 'package:mobile/features/study_spots/presentation/past_visits_sheet.dart' show formatVisitDate;
+import 'package:mobile/features/study_spots/presentation/past_visits_sheet.dart'
+    show formatVisitDate;
 import 'package:mobile/main.dart';
 import 'package:mobile/models/me.dart';
 import 'package:mobile/models/visit.dart';
@@ -37,7 +38,10 @@ class ProfilePage extends StatelessWidget {
           listenable: auth,
           builder: (context, _) {
             final me = auth.me;
-            if (me == null) return const Center(child: CircularProgressIndicator(color: Tone.ink));
+            if (me == null)
+              return const Center(
+                child: CircularProgressIndicator(color: Tone.ink),
+              );
 
             return SingleChildScrollView(
               padding: const EdgeInsets.fromLTRB(20, 20, 20, 40),
@@ -73,7 +77,8 @@ class ProfilePage extends StatelessWidget {
                   // most often the app was closed between verifying and picking a
                   // handle. Sign-in/sign-up would just loop (that email is already
                   // theirs); the only way out is straight to ChooseHandlePage.
-                  else if (FirebaseAuth.instance.currentUser?.isAnonymous == false)
+                  else if (FirebaseAuth.instance.currentUser?.isAnonymous ==
+                      false)
                     _FinishSetupPrompt(auth: auth)
                   else
                     _GuestPrompt(auth: auth, me: me),
@@ -106,34 +111,55 @@ class _GuestPrompt extends StatelessWidget {
           Text(
             "Looks like you don't have an account",
             textAlign: TextAlign.center,
-            style: GoogleFonts.fraunces(fontSize: 18, fontWeight: FontWeight.w800, color: Tone.ink),
+            style: GoogleFonts.fraunces(
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+              color: Tone.ink,
+            ),
           ),
           const SizedBox(height: 8),
           Text(
             "You're browsing as a guest — your spots stay right here on this device. "
             'Create one to keep them for good, on any device.',
             textAlign: TextAlign.center,
-            style: GoogleFonts.fraunces(fontSize: 13.5, fontWeight: FontWeight.w500, color: Tone.muted),
+            style: GoogleFonts.fraunces(
+              fontSize: 13.5,
+              fontWeight: FontWeight.w500,
+              color: Tone.muted,
+            ),
           ),
           const SizedBox(height: 8),
           Text(
             '${me.entryCount} of $guestEntryLimit guest spots used',
-            style: GoogleFonts.fraunces(fontSize: 12.5, fontWeight: FontWeight.w600, color: Tone.terracotta),
+            style: GoogleFonts.fraunces(
+              fontSize: 12.5,
+              fontWeight: FontWeight.w600,
+              color: Tone.terracotta,
+            ),
           ),
           const SizedBox(height: 24),
           SizedBox(
             width: double.infinity,
             child: GestureDetector(
-              onTap: () => Navigator.of(context).push(MaterialPageRoute(
-                builder: (_) => LoginPage(auth: auth, startInSignUp: true),
-              )),
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => LoginPage(auth: auth, startInSignUp: true),
+                ),
+              ),
               child: Container(
                 padding: const EdgeInsets.symmetric(vertical: 14),
-                decoration: BoxDecoration(color: Tone.ink, borderRadius: BorderRadius.circular(14)),
+                decoration: BoxDecoration(
+                  color: Tone.ink,
+                  borderRadius: BorderRadius.circular(14),
+                ),
                 child: Center(
                   child: Text(
                     'Create one here',
-                    style: GoogleFonts.fraunces(fontSize: 14.5, fontWeight: FontWeight.w700, color: Colors.white),
+                    style: GoogleFonts.fraunces(
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
                   ),
                 ),
               ),
@@ -141,12 +167,18 @@ class _GuestPrompt extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           GestureDetector(
-            onTap: () => Navigator.of(context).push(MaterialPageRoute(
-              builder: (_) => LoginPage(auth: auth, startInSignUp: false),
-            )),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => LoginPage(auth: auth, startInSignUp: false),
+              ),
+            ),
             child: Text(
               'Already have an account? Sign in',
-              style: GoogleFonts.fraunces(fontSize: 12.5, fontWeight: FontWeight.w700, color: Tone.terracotta),
+              style: GoogleFonts.fraunces(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w700,
+                color: Tone.terracotta,
+              ),
             ),
           ),
         ],
@@ -164,7 +196,10 @@ class _FinishSetupPrompt extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(color: Tone.field, borderRadius: BorderRadius.circular(18)),
+      decoration: BoxDecoration(
+        color: Tone.field,
+        borderRadius: BorderRadius.circular(18),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -172,28 +207,43 @@ class _FinishSetupPrompt extends StatelessWidget {
           const SizedBox(height: 14),
           Text(
             'Almost done',
-            style: GoogleFonts.fraunces(fontSize: 17, fontWeight: FontWeight.w800, color: Tone.ink),
+            style: GoogleFonts.fraunces(
+              fontSize: 17,
+              fontWeight: FontWeight.w800,
+              color: Tone.ink,
+            ),
           ),
           const SizedBox(height: 6),
           Text(
             "You're signed in, but never picked a handle. Finish setting up your "
             'account to keep your spots for good.',
-            style: GoogleFonts.fraunces(fontSize: 13.5, fontWeight: FontWeight.w500, color: Tone.muted),
+            style: GoogleFonts.fraunces(
+              fontSize: 13.5,
+              fontWeight: FontWeight.w500,
+              color: Tone.muted,
+            ),
           ),
           const SizedBox(height: 16),
           SizedBox(
             width: double.infinity,
             child: GestureDetector(
-              onTap: () => Navigator.of(context).push(MaterialPageRoute(
-                builder: (_) => ChooseHandlePage(auth: auth),
-              )),
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => ChooseHandlePage(auth: auth)),
+              ),
               child: Container(
                 padding: const EdgeInsets.symmetric(vertical: 14),
-                decoration: BoxDecoration(color: Tone.ink, borderRadius: BorderRadius.circular(14)),
+                decoration: BoxDecoration(
+                  color: Tone.ink,
+                  borderRadius: BorderRadius.circular(14),
+                ),
                 child: Center(
                   child: Text(
                     'Finish setting up',
-                    style: GoogleFonts.fraunces(fontSize: 14.5, fontWeight: FontWeight.w700, color: Colors.white),
+                    style: GoogleFonts.fraunces(
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
                   ),
                 ),
               ),
@@ -234,7 +284,11 @@ class _AccountCard extends StatelessWidget {
           backgroundColor: Tone.ink,
           content: Text(
             e.message,
-            style: GoogleFonts.fraunces(fontSize: 13.5, fontWeight: FontWeight.w600, color: Colors.white),
+            style: GoogleFonts.fraunces(
+              fontSize: 13.5,
+              fontWeight: FontWeight.w600,
+              color: Colors.white,
+            ),
           ),
         ),
       );
@@ -243,79 +297,99 @@ class _AccountCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tone = resolveAvatarTone(colorSlug: me.avatarColor, backgroundTint: me.avatarBackgroundTint);
+    final tone = resolveAvatarTone(
+      colorSlug: me.avatarColor,
+      backgroundTint: me.avatarBackgroundTint,
+    );
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        GestureDetector(
-          onTap: () => _pickAvatar(context),
-          child: Stack(
-            alignment: Alignment.bottomRight,
-            children: [
-              CircleAvatar(
-                radius: 40,
-                backgroundColor: tone.background,
-                // cafe_01 draws its own circular frame, so it fills the CircleAvatar
-                // edge-to-edge; the others get a small margin so they don't crowd it.
-                child: me.avatarId != null
-                    ? AvatarIconSketch(
-                        avatarId: me.avatarId!,
-                        size: me.avatarId == 'cafe_01' ? 80 : 64,
-                        color: tone.icon,
-                      )
-                    : Text(
-                        me.displayName.isNotEmpty ? me.displayName[0].toUpperCase() : '?',
-                        style: GoogleFonts.fraunces(fontSize: 28, fontWeight: FontWeight.w800, color: tone.icon),
-                      ),
-              ),
-              Container(
-                padding: const EdgeInsets.all(5),
-                decoration: BoxDecoration(
-                  color: Tone.terracotta,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Tone.bg, width: 2),
+    return SizedBox(
+      width: double.infinity,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          GestureDetector(
+            onTap: () => _pickAvatar(context),
+            child: Stack(
+              alignment: Alignment.bottomRight,
+              children: [
+                CircleAvatar(
+                  radius: 40,
+                  backgroundColor: tone.background,
+                  // cafe_01 draws its own circular frame, so it fills the CircleAvatar
+                  // edge-to-edge; the others get a small margin so they don't crowd it.
+                  child: me.avatarId != null
+                      ? AvatarIconSketch(
+                          avatarId: me.avatarId!,
+                          size: me.avatarId == 'cafe_01' ? 80 : 64,
+                          color: tone.icon,
+                        )
+                      : Text(
+                          me.displayName.isNotEmpty
+                              ? me.displayName[0].toUpperCase()
+                              : '?',
+                          style: GoogleFonts.fraunces(
+                            fontSize: 28,
+                            fontWeight: FontWeight.w800,
+                            color: tone.icon,
+                          ),
+                        ),
                 ),
-                child: const Icon(Icons.edit, size: 12, color: Colors.white),
-              ),
-            ],
+                Container(
+                  padding: const EdgeInsets.all(5),
+                  decoration: BoxDecoration(
+                    color: Tone.terracotta,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Tone.bg, width: 2),
+                  ),
+                  child: const Icon(Icons.edit, size: 12, color: Colors.white),
+                ),
+              ],
+            ),
           ),
-        ),
-        const SizedBox(height: 14),
-        Text(
-          me.displayName,
-          style: GoogleFonts.fraunces(fontSize: 19, fontWeight: FontWeight.w800, color: Tone.ink),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          '@${me.handle}',
-          style: GoogleFonts.fraunces(fontSize: 13.5, fontWeight: FontWeight.w600, color: Tone.muted),
-        ),
-        const SizedBox(height: 36),
-        // The one thing worth seeing at a glance — big and centered rather than a
-        // small pill next to an icon.
-        Text(
-          '${me.entryCount}',
-          style: GoogleFonts.fraunces(
-            fontSize: 56,
-            fontWeight: FontWeight.w800,
-            height: 1,
-            color: Tone.terracotta,
+          const SizedBox(height: 14),
+          Text(
+            me.displayName,
+            style: GoogleFonts.fraunces(
+              fontSize: 19,
+              fontWeight: FontWeight.w800,
+              color: Tone.ink,
+            ),
           ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          me.entryCount == 1 ? 'spot rated' : 'spots rated',
-          style: GoogleFonts.fraunces(
-            fontSize: 13,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 0.5,
-            color: Tone.muted,
+          const SizedBox(height: 2),
+          Text(
+            '@${me.handle}',
+            style: GoogleFonts.fraunces(
+              fontSize: 13.5,
+              fontWeight: FontWeight.w600,
+              color: Tone.muted,
+            ),
           ),
-        ),
-        const SizedBox(height: 40),
-        const _StudyHistorySection(),
-      ],
+          const SizedBox(height: 36),
+          // The one thing worth seeing at a glance — big and centered rather than a
+          // small pill next to an icon.
+          Text(
+            '${me.entryCount}',
+            style: GoogleFonts.fraunces(
+              fontSize: 56,
+              fontWeight: FontWeight.w800,
+              height: 1,
+              color: Tone.terracotta,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            me.entryCount == 1 ? 'spot rated' : 'spots rated',
+            style: GoogleFonts.fraunces(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.5,
+              color: Tone.muted,
+            ),
+          ),
+          const SizedBox(height: 40),
+          const _StudyHistorySection(),
+        ],
+      ),
     );
   }
 }
@@ -379,9 +453,14 @@ class _StudyHistorySectionState extends State<_StudyHistorySection> {
       return const Padding(
         padding: EdgeInsets.symmetric(vertical: 8),
         child: SizedBox(
-          width: 18,
-          height: 18,
-          child: CircularProgressIndicator(strokeWidth: 2, color: Tone.muted),
+          width: double.infinity,
+          child: Center(
+            child: SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(strokeWidth: 2, color: Tone.muted),
+            ),
+          ),
         ),
       );
     }
@@ -389,7 +468,11 @@ class _StudyHistorySectionState extends State<_StudyHistorySection> {
     if (visits.isEmpty) {
       return Text(
         'No visits yet — log one from a spot you\'ve rated.',
-        style: GoogleFonts.fraunces(fontSize: 13, fontWeight: FontWeight.w500, color: Tone.muted),
+        style: GoogleFonts.fraunces(
+          fontSize: 13,
+          fontWeight: FontWeight.w500,
+          color: Tone.muted,
+        ),
       );
     }
 
@@ -425,7 +508,11 @@ class _VisitHistoryRow extends StatelessWidget {
               children: [
                 Text(
                   visit.spotName,
-                  style: GoogleFonts.fraunces(fontSize: 14, fontWeight: FontWeight.w700, color: Tone.ink),
+                  style: GoogleFonts.fraunces(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: Tone.ink,
+                  ),
                 ),
                 if (studied != null) ...[
                   const SizedBox(height: 4),
@@ -441,7 +528,11 @@ class _VisitHistoryRow extends StatelessWidget {
           const SizedBox(width: 10),
           Text(
             formatVisitDate(visit.visitedAt, includeYear: true),
-            style: GoogleFonts.fraunces(fontSize: 12.5, fontWeight: FontWeight.w700, color: Tone.terracotta),
+            style: GoogleFonts.fraunces(
+              fontSize: 12.5,
+              fontWeight: FontWeight.w700,
+              color: Tone.terracotta,
+            ),
           ),
         ],
       ),
@@ -464,11 +555,19 @@ class _LabeledLine extends StatelessWidget {
         children: [
           TextSpan(
             text: '$label: ',
-            style: GoogleFonts.fraunces(fontSize: 13, fontWeight: FontWeight.w700, color: Tone.ink),
+            style: GoogleFonts.fraunces(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: Tone.ink,
+            ),
           ),
           TextSpan(
             text: value,
-            style: GoogleFonts.fraunces(fontSize: 13, fontWeight: FontWeight.w500, color: Tone.muted),
+            style: GoogleFonts.fraunces(
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+              color: Tone.muted,
+            ),
           ),
         ],
       ),

@@ -1,0 +1,15 @@
+# flyctl launch added from .idea/.idea.study-spot-backend/.idea/.gitignore
+# Default ignored files
+.idea/.idea.study-spot-backend/.idea/shelf
+.idea/.idea.study-spot-backend/.idea/workspace.xml
+# Rider ignored files
+.idea/.idea.study-spot-backend/.idea/contentModel.xml
+.idea/.idea.study-spot-backend/.idea/.idea.study-spot-backend.iml
+.idea/.idea.study-spot-backend/.idea/modules.xml
+.idea/.idea.study-spot-backend/.idea/projectSettingsUpdater.xml
+# Editor-based HTTP Client requests
+.idea/.idea.study-spot-backend/.idea/httpRequests
+# Datasource local storage ignored files
+.idea/.idea.study-spot-backend/.idea/dataSources
+.idea/.idea.study-spot-backend/.idea/dataSources.local.xml
+fly.toml

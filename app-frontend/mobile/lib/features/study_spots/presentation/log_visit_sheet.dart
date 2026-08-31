@@ -222,7 +222,7 @@ class _LogVisitDialogState extends State<LogVisitDialog> {
   Widget _bigField() {
     return Container(
       decoration: BoxDecoration(color: Tone.field, borderRadius: BorderRadius.circular(16)),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       child: TextField(
         controller: _studiedController,
         minLines: 3,
@@ -233,7 +233,7 @@ class _LogVisitDialogState extends State<LogVisitDialog> {
           counterText: '',
           hintText: 'Organic chemistry, chapter 4 problem set...',
           hintStyle: GoogleFonts.fraunces(
-            fontSize: 16.5,
+            fontSize: 15,
             fontWeight: FontWeight.w500,
             color: Tone.muted,
             height: 1.4,

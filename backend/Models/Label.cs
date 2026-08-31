@@ -34,11 +34,10 @@ public class Label : ITimestamped
 {
     public Guid Id { get; set; }
 
-    // Normalized: lowercase alphanumeric only, no separators — "Best for reading"
-    // becomes "bestforreading". Hashtag-shaped on purpose (the feature is modeled on
-    // Beli's Labels, and the user's own examples were #cozy / #bestforreading, not
-    // kebab-case) — a hyphen would break the #slug rendering the picker and filter
-    // chips do. See ck_labels_slug_format in AppDbContext.
+    // Normalized: lowercase kebab-case — "Best for reading" becomes "best-for-reading".
+    // The #slug pill in the picker/filter chips is plain text (Text('#${slug}')), not a
+    // real hashtag parser, so a hyphen renders fine there (decision D14, 2026-08-31,
+    // reversing the earlier no-hyphen rule). See ck_labels_slug_format in AppDbContext.
     public required string Slug { get; set; }
 
     // The human-readable form, as typed. Can't be losslessly reconstructed from Slug,
