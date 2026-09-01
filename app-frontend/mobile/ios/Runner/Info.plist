@@ -60,12 +60,11 @@
 	<key>UIMainStoryboardFile</key>
 	<string>Main</string>
 	<!-- Portrait only - nothing in the app was designed or tested against landscape/
-	     upside-down layouts. -->
+	     upside-down layouts. No ~ipad variant needed: TARGETED_DEVICE_FAMILY is
+	     iPhone-only (1), so Apple's iPad-multitasking full-rotation requirement (which
+	     forced a temporary all-four-orientations ~ipad entry here before) no longer
+	     applies - the app doesn't declare iPad support at all. -->
 	<key>UISupportedInterfaceOrientations</key>
-	<array>
-		<string>UIInterfaceOrientationPortrait</string>
-	</array>
-	<key>UISupportedInterfaceOrientations~ipad</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
 	</array>
