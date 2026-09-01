@@ -8,11 +8,12 @@ import 'package:mobile/features/authentication/presentation/choose_handle_page.d
 import 'package:mobile/features/authentication/presentation/verify_email_page.dart';
 import 'package:mobile/services/api_service.dart';
 import 'package:mobile/services/auth_controller.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
 enum _Mode { signUp, signIn }
 
-/// Email/password sign-up and sign-in, plus a Google button. No Apple button — see
-/// context/auth-plan.md, "Apple is out of scope".
+/// Email/password sign-up and sign-in, plus Google and Apple buttons — Apple is
+/// required alongside Google per App Store guideline 4.8, not optional polish.
 ///
 /// Both paths *link* the guest's current anonymous session (see AuthController), so
 /// whatever they've already added carries over. If that email turns out to already have
@@ -193,6 +194,63 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
+  // Same shape as _submitGoogle - see its doc for the guest-linking/needsRegistration
+  // handling, which is identical here.
+  Future<void> _submitApple() async {
+    setState(() {
+      _submitting = true;
+      _error = null;
+    });
+
+    try {
+      await widget.auth.signInWithApple();
+      if (!mounted) return;
+
+      if (widget.auth.phase == AuthPhase.needsRegistration) {
+        await Navigator.of(context).push(MaterialPageRoute(
+          builder: (_) => ChooseHandlePage(auth: widget.auth),
+        ));
+        if (!mounted) return;
+      }
+
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    } on SignInWithAppleAuthorizationException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _submitting = false;
+        // A user backing out of the Apple sheet isn't an error worth surfacing.
+        if (e.code != AuthorizationErrorCode.canceled) {
+          _error = 'Could not sign in with Apple. Try again.';
+        }
+      });
+    } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _submitting = false;
+        _error = e.code == 'account-exists-with-different-credential'
+            ? 'You already have an account with this email — sign in with your '
+                'password, then link Apple from your profile.'
+            : _messageFor(e);
+      });
+    } catch (e) {
+      if (e is ApiException && e.needsRegistration) {
+        if (!mounted) return;
+        await Navigator.of(context).push(MaterialPageRoute(
+          builder: (_) => ChooseHandlePage(auth: widget.auth),
+        ));
+        if (!mounted) return;
+        Navigator.of(context).popUntil((route) => route.isFirst);
+        return;
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _submitting = false;
+        _error = 'Something went wrong. Try again.';
+      });
+    }
+  }
+
   String _messageFor(FirebaseAuthException e) => switch (e.code) {
         'invalid-email' => 'That email address looks wrong.',
         'weak-password' => 'Choose a stronger password (6+ characters).',
@@ -240,6 +298,8 @@ class _LoginPageState extends State<LoginPage> {
                 ),
               ),
               const SizedBox(height: 28),
+              _appleButton(),
+              const SizedBox(height: 12),
               _googleButton(),
               const SizedBox(height: 20),
               _orDivider(),
@@ -328,6 +388,21 @@ class _LoginPageState extends State<LoginPage> {
           color: Tone.muted,
         ),
       );
+
+  // Apple's own button widget, not a hand-rolled one like _googleButton - Apple's
+  // Human Interface Guidelines require using their supplied button for brand/contrast
+  // compliance, not a custom look-alike.
+  Widget _appleButton() {
+    return SizedBox(
+      width: double.infinity,
+      height: 46,
+      child: SignInWithAppleButton(
+        onPressed: _submitting ? () {} : _submitApple,
+        style: SignInWithAppleButtonStyle.black,
+        borderRadius: BorderRadius.circular(14),
+      ),
+    );
+  }
 
   Widget _googleButton() {
     return SizedBox(

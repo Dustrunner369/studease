@@ -20,7 +20,8 @@ public class FeedbackMailer(IConfiguration configuration, ILogger<FeedbackMailer
         !string.IsNullOrWhiteSpace(_smtpAppPassword) &&
         !string.IsNullOrWhiteSpace(_recipient);
 
-    public async Task SendAsync(string type, string message, string fromHandle, CancellationToken ct = default)
+    public async Task SendAsync(
+        string type, string message, string displayName, string handle, CancellationToken ct = default)
     {
         if (!IsConfigured) throw new InvalidOperationException("FeedbackMailer is not configured");
 
@@ -28,11 +29,18 @@ public class FeedbackMailer(IConfiguration configuration, ILogger<FeedbackMailer
         email.From.Add(MailboxAddress.Parse(_smtpUser!));
         email.To.Add(MailboxAddress.Parse(_recipient!));
         email.Subject = $"[Studease feedback] {type}";
-        email.Body = new TextPart("plain") { Text = $"From: @{fromHandle}\nType: {type}\n\n{message}" };
+        email.Body = new TextPart("plain") { Text = $"From: {displayName} (@{handle})\nType: {type}\n\n{message}" };
 
         using var client = new SmtpClient();
         try
         {
+            // Some networks (this held true even locally over plain home wifi while
+            // testing) can't complete the OCSP/CRL revocation check .NET attempts
+            // during the handshake, which otherwise fails the connection outright even
+            // though the certificate itself is valid - MailKit's documented fix is to
+            // stop requiring that check specifically. Chain, hostname, and expiry are
+            // still fully validated; only the revocation check is skipped.
+            client.CheckCertificateRevocation = false;
             await client.ConnectAsync("smtp.gmail.com", 587, SecureSocketOptions.StartTls, ct);
             await client.AuthenticateAsync(_smtpUser!, _smtpAppPassword!, ct);
             await client.SendAsync(email, ct);

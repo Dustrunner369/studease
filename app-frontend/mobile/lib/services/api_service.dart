@@ -277,6 +277,17 @@ Future<void> submitFeedback({required String type, required String message}) asy
       ));
 }
 
+/// Permanently deletes the caller's account and all their data server-side. Must be
+/// called while still signed in (needs a valid token) - AuthController.deleteAccount
+/// calls this before deleting the underlying Firebase user, since currentUser goes null
+/// (and with it, any way to get a fresh token) the moment that happens. Named distinctly
+/// from AuthController.deleteAccount (not just `deleteAccount`) since that method calls
+/// this one - same name would resolve to itself instead, as an unqualified call favors
+/// the instance method over the top-level function.
+Future<void> deleteAccountData() async {
+  await _send((headers) => http.delete(Uri.parse('$baseUrl/me'), headers: headers));
+}
+
 Future<dynamic> _send(Future<http.Response> Function(Map<String, String> headers) request) async {
   var response = await _attempt(request, forceRefresh: false);
 

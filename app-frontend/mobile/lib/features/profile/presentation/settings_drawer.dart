@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:mobile/design/theme.dart';
+import 'package:mobile/features/profile/presentation/delete_account_page.dart';
 import 'package:mobile/features/profile/presentation/feedback_page.dart';
 import 'package:mobile/features/profile/presentation/privacy_policy_page.dart';
 import 'package:mobile/main.dart';
@@ -73,6 +74,15 @@ class SettingsDrawer extends StatelessWidget {
               label: 'Sign out',
               labelColor: Tone.error,
               onTap: () => _signOut(context),
+            ),
+            const Divider(height: 1, thickness: 1, color: Tone.line),
+            _SettingsRow(
+              icon: Icons.person_remove_outlined,
+              label: 'Delete Account',
+              labelColor: Tone.error,
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => DeleteAccountPage(auth: auth)),
+              ),
             ),
             const Divider(height: 1, thickness: 1, color: Tone.line),
           ],

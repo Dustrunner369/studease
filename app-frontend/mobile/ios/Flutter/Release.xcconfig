@@ -1,1 +1,20 @@
 #include "Generated.xcconfig"
+
+// Bakes the production API URL into every Release-configuration build - Xcode Archive,
+// `flutter build ipa`, whatever produces the binary that ships to TestFlight/the App
+// Store - so it works even if --dart-define is forgotten at build time. Without this,
+// api_service.dart's baseUrl silently falls back to http://localhost:5001, which is
+// meaningless on a real device and would ship a completely non-functional build.
+//
+// Placed after the #include on purpose: Generated.xcconfig is rewritten by every
+// `flutter run`/`flutter build` to match whatever --dart-define flags (if any) were
+// passed to THAT invocation, so it can't be relied on to carry this forward by itself.
+// xcconfig resolves a later same-key setting as the override, so this line always wins
+// for Release, regardless of what Generated.xcconfig contains when Xcode reads it.
+//
+// DART_DEFINES is Flutter's own encoding (encodeDartDefines in
+// flutter_tools/lib/src/build_info.dart): each "KEY=VALUE" pair is UTF-8 then
+// base64-encoded, comma-joined. This one value decodes to
+// API_BASE_URL=https://studease-backend.fly.dev - to change the target URL, re-derive
+// with e.g. `echo -n "API_BASE_URL=<new-url>" | base64`.
+DART_DEFINES=QVBJX0JBU0VfVVJMPWh0dHBzOi8vc3R1ZGVhc2UtYmFja2VuZC5mbHkuZGV2

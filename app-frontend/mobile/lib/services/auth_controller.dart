@@ -1,10 +1,26 @@
+import 'dart:convert';
+import 'dart:math';
+
+import 'package:crypto/crypto.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:mobile/models/me.dart';
 import 'package:mobile/services/api_service.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
 enum AuthPhase { loading, ready, needsRegistration, needsEmailVerification, error }
+
+// Apple requires a nonce round-trip as replay protection: the raw value goes to Apple
+// (hashed) and to Firebase (raw) so Firebase can verify Apple's identity token was
+// minted for this exact request, not replayed from an intercepted one.
+String _randomNonce([int length = 32]) {
+  const charset = '0123456789ABCDEFGHIJKLMNOPQRSTUVXYZabcdefghijklmnopqrstuvwxyz-._';
+  final random = Random.secure();
+  return List.generate(length, (_) => charset[random.nextInt(charset.length)]).join();
+}
+
+String _sha256(String input) => sha256.convert(utf8.encode(input)).toString();
 
 class AuthController extends ChangeNotifier {
   AuthPhase phase = AuthPhase.loading;
@@ -164,8 +180,81 @@ class AuthController extends ChangeNotifier {
     notifyListeners();
   }
 
+  // Apple accounts arrive pre-verified, same as Google - see signInWithGoogle's doc for
+  // why this checks me.isGuest rather than relying on a thrown ApiException.
+  Future<void> signInWithApple() async {
+    final rawNonce = _randomNonce();
+    final appleCredential = await SignInWithApple.getAppleIDCredential(
+      scopes: [AppleIDAuthorizationScopes.email, AppleIDAuthorizationScopes.fullName],
+      nonce: _sha256(rawNonce),
+    );
+
+    final credential = OAuthProvider('apple.com').credential(
+      idToken: appleCredential.identityToken,
+      rawNonce: rawNonce,
+    );
+    final current = FirebaseAuth.instance.currentUser;
+
+    if (current != null && current.isAnonymous) {
+      await current.linkWithCredential(credential);
+    } else {
+      await FirebaseAuth.instance.signInWithCredential(credential);
+    }
+
+    me = await fetchMe();
+    phase = me!.isGuest ? AuthPhase.needsRegistration : AuthPhase.ready;
+    notifyListeners();
+  }
+
   Future<void> signOut() async {
     await FirebaseAuth.instance.signOut();
+    await bootstrap();
+  }
+
+  // Which credential DeleteAccountPage needs to re-collect before a delete is allowed to
+  // proceed - Firebase requires a "recent" sign-in for this sensitive an operation and
+  // throws requires-recent-login otherwise, so re-auth happens unconditionally up front
+  // rather than reactively after a failed delete.
+  String get reauthProvider {
+    final providerIds = FirebaseAuth.instance.currentUser!.providerData.map((p) => p.providerId);
+    if (providerIds.contains('password')) return 'password';
+    if (providerIds.contains('apple.com')) return 'apple.com';
+    return 'google.com';
+  }
+
+  Future<void> reauthenticateWithPassword(String password) async {
+    final user = FirebaseAuth.instance.currentUser!;
+    final credential = EmailAuthProvider.credential(email: user.email!, password: password);
+    await user.reauthenticateWithCredential(credential);
+  }
+
+  Future<void> reauthenticateWithGoogle() async {
+    final account = await GoogleSignIn.instance.authenticate();
+    final credential = GoogleAuthProvider.credential(idToken: account.authentication.idToken);
+    await FirebaseAuth.instance.currentUser!.reauthenticateWithCredential(credential);
+  }
+
+  Future<void> reauthenticateWithApple() async {
+    final rawNonce = _randomNonce();
+    final appleCredential = await SignInWithApple.getAppleIDCredential(
+      scopes: [AppleIDAuthorizationScopes.email, AppleIDAuthorizationScopes.fullName],
+      nonce: _sha256(rawNonce),
+    );
+    final credential = OAuthProvider('apple.com').credential(
+      idToken: appleCredential.identityToken,
+      rawNonce: rawNonce,
+    );
+    await FirebaseAuth.instance.currentUser!.reauthenticateWithCredential(credential);
+  }
+
+  // Permanently deletes the account: server-side data first (needs a valid token, which
+  // only exists while the Firebase user still does), then the Firebase identity itself.
+  // Assumes DeleteAccountPage already re-authenticated - called right after, so the
+  // "recent login" window is still open and this shouldn't itself throw
+  // requires-recent-login.
+  Future<void> deleteAccount() async {
+    await deleteAccountData();
+    await FirebaseAuth.instance.currentUser!.delete();
     await bootstrap();
   }
 }

@@ -220,7 +220,21 @@ engineer around.
 
 ### Apple is out of scope
 
-**Decided: email/password and Google only.** Sign in with Apple is not being built.
+**Reversed 2026-08-31.** The one condition below that forced a revisit — public App Store
+release with Google sign-in enabled — is now the actual situation, so Sign in with Apple
+was added: `signInWithApple`/`reauthenticateWithApple` in `AuthController`, a button on
+`LoginPage`, a third branch in `DeleteAccountPage`'s reauth step, the
+`com.apple.developer.applesignin` entitlement, and the `sign_in_with_apple` package. As
+predicted below, the backend needed zero changes — `(auth_provider, auth_subject)` already
+treated every Firebase provider identically. Two manual steps outside this repo still
+gate it working at all: enabling "Sign in with Apple" for `app.studease.mobile` on the
+Apple Developer portal, and toggling Apple on in Firebase Console's sign-in providers
+(the Services ID/private-key fields there are only for the web OAuth flow — leave them
+blank, this app is native-only).
+
+The reasoning below is kept as-written for context, not because the decision still holds.
+
+**~~Decided: email/password and Google only.~~ Sign in with Apple is not being built.**
 
 Nothing in the design depends on that choice — `(auth_provider, auth_subject)` treats every
 Firebase provider identically, and adding Apple later is one provider call in the client

@@ -1337,9 +1337,15 @@ class _UndoToastState extends State<_UndoToast> with SingleTickerProviderStateMi
     return Positioned(
       left: 16,
       right: 16,
-      // Cleared above the bottom nav's raised "+" button, which pokes
-      // CleanBottomNav._overlap above the bar itself.
-      bottom: CleanBottomNav._overlap + 16,
+      // This Positioned is in the root Overlay, not scoped to the bottom nav - so
+      // "bottom" here means distance from the screen's own bottom edge, not from the
+      // bar's top. Clearing the raised "+" button means clearing all of: the device's
+      // bottom safe-area inset, the bar's own content height, and how far the button
+      // pokes above the bar - not just that last part on its own.
+      bottom: MediaQuery.of(context).padding.bottom +
+          CleanBottomNav._barHeight +
+          CleanBottomNav._overlap +
+          16,
       child: SlideTransition(
         position: Tween<Offset>(begin: const Offset(0, 0.4), end: Offset.zero).animate(curved),
         child: FadeTransition(
@@ -1531,6 +1537,10 @@ class _SheetButton extends StatelessWidget {
 /// context/auth-plan.md on deferring routing changes.
 class CleanBottomNav extends StatelessWidget {
   static const double _buttonSize = 60;
+  // The bar's own content height, excluding the bottom safe-area inset SafeArea adds
+  // on top of it. _UndoToast needs this to position itself above the bar from the
+  // root Overlay, which knows nothing about the bar's internal layout.
+  static const double _barHeight = 60;
   // How far the add button pokes above the bar's top edge, Venmo-style.
   static const double _overlap = 22;
   // Breathing room between the notch curve and the button's own ring.
@@ -1574,7 +1584,7 @@ class CleanBottomNav extends StatelessWidget {
       child: SafeArea(
         top: false,
         child: SizedBox(
-          height: 60,
+          height: _barHeight,
           child: Stack(
             clipBehavior: Clip.none,
             alignment: Alignment.center,

@@ -38,10 +38,11 @@ class ProfilePage extends StatelessWidget {
           listenable: auth,
           builder: (context, _) {
             final me = auth.me;
-            if (me == null)
+            if (me == null) {
               return const Center(
                 child: CircularProgressIndicator(color: Tone.ink),
               );
+            }
 
             return SingleChildScrollView(
               padding: const EdgeInsets.fromLTRB(20, 20, 20, 40),

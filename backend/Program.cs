@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using System.Threading.RateLimiting;
 using study_spot_backend;
 using study_spot_backend.Dtos;
 using study_spot_backend.Models;
@@ -99,6 +100,36 @@ builder.Services.AddAuthorization();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<CurrentUser>();
 
+// Nothing had any throttling before this - fine while only I was hitting it, not once
+// /feedback started sending real email to my own inbox. Partitioned by IP rather than
+// by user: it needs to also cover the public /privacy.html and /support.html pages
+// (served before auth even runs), and a per-user partition would need the JWT already
+// resolved, which isn't guaranteed this early in the pipeline.
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    string ClientKey(HttpContext ctx) => ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+
+    // Generous backstop for the whole API - real usage should never come close to this,
+    // it's just a floor against basic scripted abuse.
+    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(ctx =>
+        RateLimitPartition.GetFixedWindowLimiter(ClientKey(ctx), _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 120,
+            Window = TimeSpan.FromMinutes(1),
+        }));
+
+    // Feedback sends a real email to my own inbox now - the one endpoint where abuse has
+    // a direct external consequence, so it gets a tighter policy on top of the global one.
+    options.AddPolicy("feedback", ctx =>
+        RateLimitPartition.GetFixedWindowLimiter(ClientKey(ctx), _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 5,
+            Window = TimeSpan.FromHours(1),
+        }));
+});
+
 var app = builder.Build();
 
 if (allowDevBypass)
@@ -125,6 +156,16 @@ using (var migrationContext = new AppDbContext(migrationOptions))
 }
 
 app.UseCors();
+
+// Early on purpose - applies to literally every request, including the public static
+// pages below and anything that never makes it past authentication.
+app.UseRateLimiter();
+
+// Serves wwwroot/privacy.html at /privacy.html - the public, unauthenticated page App
+// Store Connect's Privacy Policy URL field links to. Placed before auth so it's never
+// gated behind a token; context/privacy-policy.md is the source of truth, kept in sync
+// with this file and the in-app PrivacyPolicyPage by hand.
+app.UseStaticFiles();
 
 app.UseAuthentication();
 app.UseAuthorization();
@@ -170,7 +211,8 @@ api.MapGet("/places/search", async (string? q, PlacesClient places, Cancellation
 // Emails the submission straight to the developer's inbox - see FeedbackMailer. No
 // feedback table or admin UI: not worth building for a low-traffic app.
 registered.MapPost("/feedback", async (
-    SubmitFeedbackRequest request, FeedbackMailer mailer, CurrentUser currentUser, CancellationToken ct) =>
+    SubmitFeedbackRequest request, FeedbackMailer mailer, CurrentUser currentUser,
+    ILogger<FeedbackMailer> logger, CancellationToken ct) =>
 {
     var message = request.Message?.Trim();
     var errors = new Dictionary<string, string[]>();
@@ -198,10 +240,14 @@ registered.MapPost("/feedback", async (
 
     try
     {
-        await mailer.SendAsync(request.Type!, message!, user.Handle, ct);
+        await mailer.SendAsync(request.Type!, message!, user.DisplayName, user.Handle, ct);
     }
-    catch (Exception)
+    catch (Exception e)
     {
+        // Logged here, not in FeedbackMailer itself - a send failure is otherwise
+        // completely invisible server-side, surfaced to the caller only as a generic
+        // 502 (no SMTP internals leaked to the client).
+        logger.LogError(e, "Failed to send feedback email");
         return Results.Problem(
             title: "Could not send feedback",
             detail: "The email failed to send. Try again in a moment.",
@@ -209,7 +255,8 @@ registered.MapPost("/feedback", async (
     }
 
     return Results.NoContent();
-});
+})
+.RequireRateLimiting("feedback");
 
 // ---------------------------------------------------------------------------
 // Me
@@ -341,6 +388,55 @@ registered.MapPut("/me/avatar", async (
 
     return Results.Ok(new MeDto(user.Id, user.Handle, user.DisplayName, user.IsGuest, entryCount,
         user.AvatarId, user.AvatarColor, user.AvatarBackgroundTint));
+});
+
+// Permanently deletes the caller's account and every trace of their own data - Apple
+// guideline 5.1.1(v) requires this wherever an app supports account creation. A hard
+// delete, not a soft one via User.DeletedAt: nothing downstream reads that column today,
+// and Apple's requirement is that the data is actually gone, not just hidden.
+//
+// SpotEntry/SpotVisit rows cascade at the DB level (see AppDbContext's OnDelete.Cascade
+// for both), same as spot_entry_tags underneath SpotEntry. Spot itself and any Label the
+// user requested/approved survive - both are shared/global rows (AddedBy/RequestedBy/
+// ApprovedBy just go null, same SetNull behavior DELETE /spots/{id}/entry doesn't need
+// to think about because it never touches those tables). What's left to do by hand is
+// exactly what a cascade can't express: VisitCount is a cached counter, not derived by
+// RecomputeAggregates, so it's decremented per spot before the visits disappear; and the
+// EntryCount/Avg*/SpotTagCount aggregates on every spot the user rated need the same
+// rebuild DELETE /spots/{id}/entry triggers, just for each of those spots instead of one.
+registered.MapDelete("/me", async (AppDbContext db, CurrentUser currentUser, CancellationToken ct) =>
+{
+    var user = (await currentUser.GetAsync(ct))!;
+
+    var ratedSpotIds = await db.SpotEntries
+        .Where(e => e.UserId == user.Id)
+        .Select(e => e.SpotId)
+        .Distinct()
+        .ToListAsync(ct);
+
+    var visitCountsBySpot = await db.SpotVisits
+        .Where(v => v.UserId == user.Id)
+        .GroupBy(v => v.SpotId)
+        .Select(g => new { SpotId = g.Key, Count = g.Count() })
+        .ToListAsync(ct);
+
+    foreach (var group in visitCountsBySpot)
+    {
+        var spot = await db.Spots.FirstOrDefaultAsync(s => s.Id == group.SpotId, ct);
+        if (spot is not null) spot.VisitCount = Math.Max(0, spot.VisitCount - group.Count);
+    }
+
+    await db.SaveChangesAsync(ct);
+
+    db.Users.Remove(user);
+    await db.SaveChangesAsync(ct);
+
+    foreach (var spotId in ratedSpotIds)
+    {
+        await RecomputeAggregates(db, spotId, ct);
+    }
+
+    return Results.NoContent();
 });
 
 // ---------------------------------------------------------------------------

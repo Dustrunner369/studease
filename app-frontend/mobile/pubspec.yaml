@@ -40,6 +40,8 @@ dependencies:
   google_sign_in: ^7.2.0
   fuzzy: ^0.5.1
   url_launcher: ^6.3.2
+  sign_in_with_apple: ^8.2.0
+  crypto: ^3.0.7
 
 dev_dependencies:
   flutter_test:

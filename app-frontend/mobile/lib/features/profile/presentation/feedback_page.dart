@@ -183,7 +183,13 @@ class _FeedbackPageState extends State<FeedbackPage> {
           initialValue: _type,
           isExpanded: true,
           icon: const Icon(Icons.expand_more, color: Tone.muted),
-          decoration: const InputDecoration(border: InputBorder.none, isDense: true),
+          dropdownColor: Tone.bg,
+          borderRadius: BorderRadius.circular(14),
+          decoration: const InputDecoration(
+            border: InputBorder.none,
+            isDense: true,
+            contentPadding: EdgeInsets.symmetric(vertical: 14),
+          ),
           items: [
             for (final type in _feedbackTypes)
               DropdownMenuItem(
