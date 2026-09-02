@@ -148,7 +148,10 @@ class _AddSpotSheetState extends State<AddSpotSheet> {
     }
 
     // Autocomplete is billed per request, so wait for a pause in typing.
-    _debounce = Timer(const Duration(milliseconds: 350), () => _runSearch(query.trim()));
+    _debounce = Timer(
+      const Duration(milliseconds: 350),
+      () => _runSearch(query.trim()),
+    );
   }
 
   Future<void> _runSearch(String query) async {
@@ -164,7 +167,8 @@ class _AddSpotSheetState extends State<AddSpotSheet> {
       setState(() {
         _suggestions = results;
         _searching = false;
-        if (results.isEmpty) _searchNotice = 'No matches. You can add it by hand instead.';
+        if (results.isEmpty)
+          _searchNotice = 'No matches. You can add it by hand instead.';
       });
     } on ApiException catch (e) {
       if (!mounted) return;
@@ -228,14 +232,14 @@ class _AddSpotSheetState extends State<AddSpotSheet> {
               spotId: widget.existing!.spotId,
               name: _nameController.text.trim(),
               address: _trimmedOrNull(_addressController),
-            ))
-              .id
+            )).id
           : (await createSpot(
               googlePlaceId: _selectedPlace?.googlePlaceId,
               name: _selectedPlace == null ? _nameController.text.trim() : null,
-              address: _selectedPlace == null ? _trimmedOrNull(_addressController) : null,
-            ))
-              .id;
+              address: _selectedPlace == null
+                  ? _trimmedOrNull(_addressController)
+                  : null,
+            )).id;
 
       await saveEntry(
         spotId: spotId,
@@ -299,7 +303,10 @@ class _AddSpotSheetState extends State<AddSpotSheet> {
       pageBuilder: (context, animation, secondaryAnimation) =>
           _CelebrationDialog(spotName: spotName, tagCount: tagCount),
       transitionBuilder: (context, animation, secondaryAnimation, child) {
-        final curved = CurvedAnimation(parent: animation, curve: Motion.easeOut);
+        final curved = CurvedAnimation(
+          parent: animation,
+          curve: Motion.easeOut,
+        );
         return FadeTransition(
           opacity: curved,
           child: ScaleTransition(
@@ -319,26 +326,42 @@ class _AddSpotSheetState extends State<AddSpotSheet> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
         title: Text(
           "You've hit the guest limit",
-          style: GoogleFonts.fraunces(fontSize: 17, fontWeight: FontWeight.w800, color: Tone.ink),
+          style: GoogleFonts.fraunces(
+            fontSize: 17,
+            fontWeight: FontWeight.w800,
+            color: Tone.ink,
+          ),
         ),
         content: Text(
           'Guests can add up to $guestEntryLimit spots. Create an account to keep adding — '
           "and to keep the ones you've already added for good.",
-          style: GoogleFonts.fraunces(fontSize: 13.5, fontWeight: FontWeight.w500, color: Tone.muted),
+          style: GoogleFonts.fraunces(
+            fontSize: 13.5,
+            fontWeight: FontWeight.w500,
+            color: Tone.muted,
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(false),
             child: Text(
               'Not now',
-              style: GoogleFonts.fraunces(fontSize: 13.5, fontWeight: FontWeight.w700, color: Tone.muted),
+              style: GoogleFonts.fraunces(
+                fontSize: 13.5,
+                fontWeight: FontWeight.w700,
+                color: Tone.muted,
+              ),
             ),
           ),
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(true),
             child: Text(
               'Create account',
-              style: GoogleFonts.fraunces(fontSize: 13.5, fontWeight: FontWeight.w700, color: Tone.terracotta),
+              style: GoogleFonts.fraunces(
+                fontSize: 13.5,
+                fontWeight: FontWeight.w700,
+                color: Tone.terracotta,
+              ),
             ),
           ),
         ],
@@ -355,9 +378,11 @@ class _AddSpotSheetState extends State<AddSpotSheet> {
     // Close the sheet first: signing up navigates to a full page, and stacking that
     // on top of a modal sheet reads as broken even though it technically works.
     navigator.pop(false);
-    await navigator.push(MaterialPageRoute(
-      builder: (_) => LoginPage(auth: widget.auth, startInSignUp: true),
-    ));
+    await navigator.push(
+      MaterialPageRoute(
+        builder: (_) => LoginPage(auth: widget.auth, startInSignUp: true),
+      ),
+    );
   }
 
   static String? _trimmedOrNull(TextEditingController controller) {
@@ -367,115 +392,128 @@ class _AddSpotSheetState extends State<AddSpotSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      // Lifts the sheet clear of the keyboard.
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-      child: Container(
-        decoration: const BoxDecoration(
-          color: Tone.bg,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.of(context).size.height * 0.9,
+    final keyboardInset = MediaQuery.of(context).viewInsets.bottom;
+
+    return GestureDetector(
+      // Tapping anywhere that isn't itself a control (a field, a button, a rating
+      // dot…) dismisses the keyboard instead of leaving it up until Enter/Done.
+      onTap: () => FocusScope.of(context).unfocus(),
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        // Lifts the sheet clear of the keyboard.
+        padding: EdgeInsets.only(bottom: keyboardInset),
+        child: Container(
+          decoration: const BoxDecoration(
+            color: Tone.bg,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
           ),
-          child: SafeArea(
-            top: false,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _buildHandle(),
-                Flexible(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(22, 4, 22, 16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildTitle(),
-                        const SizedBox(height: 18),
-                        if (widget.existing != null)
-                          _buildManualFields()
-                        else if (_selectedPlace != null)
-                          _buildSelectedPlace()
-                        else if (_manualEntry)
-                          _buildManualFields()
-                        else
-                          _buildSearch(),
-                        const SizedBox(height: 22),
-                        _buildSectionLabel('TAGS'),
-                        const SizedBox(height: 10),
-                        _buildTagSection(),
-                        const SizedBox(height: 22),
-                        _buildSectionLabel('RATE IT'),
-                        const SizedBox(height: 4),
-                        _RatingRow(
-                          icon: Icons.wifi,
-                          label: 'WiFi',
-                          value: _wifi,
-                          onChanged: (v) => setState(() => _wifi = v),
-                        ),
-                        _RatingRow(
-                          icon: Icons.volume_off,
-                          label: 'Quiet',
-                          value: _quiet,
-                          onChanged: (v) => setState(() => _quiet = v),
-                        ),
-                        _RatingRow(
-                          icon: Icons.bolt,
-                          label: 'Outlets',
-                          value: _outlets,
-                          onChanged: (v) => setState(() => _outlets = v),
-                        ),
-                        _RatingRow(
-                          icon: Icons.event_seat,
-                          label: 'Seating',
-                          value: _seating,
-                          onChanged: (v) => setState(() => _seating = v),
-                        ),
-                        _RatingRow(
-                          icon: Icons.table_restaurant,
-                          label: 'Table size',
-                          value: _tableSize,
-                          onChanged: (v) => setState(() => _tableSize = v),
-                        ),
-                        _RatingRow(
-                          icon: Icons.local_cafe,
-                          label: 'Coffee',
-                          value: _coffee,
-                          onChanged: (v) => setState(() => _coffee = v),
-                        ),
-                        const SizedBox(height: 22),
-                        _buildSectionLabel('GROUP STUDY'),
-                        const SizedBox(height: 4),
-                        _GroupStudyToggle(
-                          value: _groupStudy,
-                          onChanged: (v) => setState(() => _groupStudy = v),
-                        ),
-                        const SizedBox(height: 22),
-                        _buildSectionLabel('USUAL ORDER'),
-                        const SizedBox(height: 8),
-                        _TextField(
-                          controller: _orderController,
-                          hint: 'Vanilla latte',
-                        ),
-                        const SizedBox(height: 16),
-                        _buildSectionLabel('NOTES'),
-                        const SizedBox(height: 8),
-                        _TextField(
-                          controller: _notesController,
-                          hint: 'Quiet back room with good lighting',
-                          maxLines: 3,
-                        ),
-                        if (_error != null) ...[
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              // Shrink the cap by the keyboard inset too — otherwise the sheet keeps
+              // claiming 90% of the *full* screen while also being lifted clear of the
+              // keyboard, so the two together push its top (handle, title, search
+              // field) off the top of the screen instead of just scrolling the body.
+              maxHeight:
+                  MediaQuery.of(context).size.height * 0.9 - keyboardInset,
+            ),
+            child: SafeArea(
+              top: false,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _buildHandle(),
+                  Flexible(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.fromLTRB(22, 4, 22, 16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildTitle(),
+                          const SizedBox(height: 18),
+                          if (widget.existing != null)
+                            _buildManualFields()
+                          else if (_selectedPlace != null)
+                            _buildSelectedPlace()
+                          else if (_manualEntry)
+                            _buildManualFields()
+                          else
+                            _buildSearch(),
+                          const SizedBox(height: 22),
+                          _buildSectionLabel('TAGS'),
+                          const SizedBox(height: 10),
+                          _buildTagSection(),
+                          const SizedBox(height: 22),
+                          _buildSectionLabel('RATE IT'),
+                          const SizedBox(height: 4),
+                          _RatingRow(
+                            icon: Icons.wifi,
+                            label: 'WiFi',
+                            value: _wifi,
+                            onChanged: (v) => setState(() => _wifi = v),
+                          ),
+                          _RatingRow(
+                            icon: Icons.volume_off,
+                            label: 'Quiet',
+                            value: _quiet,
+                            onChanged: (v) => setState(() => _quiet = v),
+                          ),
+                          _RatingRow(
+                            icon: Icons.bolt,
+                            label: 'Outlets',
+                            value: _outlets,
+                            onChanged: (v) => setState(() => _outlets = v),
+                          ),
+                          _RatingRow(
+                            icon: Icons.event_seat,
+                            label: 'Seating',
+                            value: _seating,
+                            onChanged: (v) => setState(() => _seating = v),
+                          ),
+                          _RatingRow(
+                            icon: Icons.table_restaurant,
+                            label: 'Table size',
+                            value: _tableSize,
+                            onChanged: (v) => setState(() => _tableSize = v),
+                          ),
+                          _RatingRow(
+                            icon: Icons.local_cafe,
+                            label: 'Coffee',
+                            value: _coffee,
+                            onChanged: (v) => setState(() => _coffee = v),
+                          ),
+                          const SizedBox(height: 22),
+                          _buildSectionLabel('GROUP STUDY'),
+                          const SizedBox(height: 4),
+                          _GroupStudyToggle(
+                            value: _groupStudy,
+                            onChanged: (v) => setState(() => _groupStudy = v),
+                          ),
+                          const SizedBox(height: 22),
+                          _buildSectionLabel('USUAL ORDER'),
+                          const SizedBox(height: 8),
+                          _TextField(
+                            controller: _orderController,
+                            hint: 'Vanilla latte',
+                          ),
                           const SizedBox(height: 16),
-                          _buildError(),
+                          _buildSectionLabel('NOTES'),
+                          const SizedBox(height: 8),
+                          _TextField(
+                            controller: _notesController,
+                            hint: 'Quiet back room with good lighting',
+                            maxLines: 3,
+                          ),
+                          if (_error != null) ...[
+                            const SizedBox(height: 16),
+                            _buildError(),
+                          ],
                         ],
-                      ],
+                      ),
                     ),
                   ),
-                ),
-                _buildSaveBar(),
-              ],
+                  _buildSaveBar(),
+                ],
+              ),
             ),
           ),
         ),
@@ -484,46 +522,46 @@ class _AddSpotSheetState extends State<AddSpotSheet> {
   }
 
   Widget _buildHandle() => Padding(
-        padding: const EdgeInsets.only(top: 12, bottom: 8),
-        child: Container(
-          width: 40,
-          height: 4,
-          decoration: BoxDecoration(
-            color: Tone.line,
-            borderRadius: BorderRadius.circular(4),
-          ),
-        ),
-      );
+    padding: const EdgeInsets.only(top: 12, bottom: 8),
+    child: Container(
+      width: 40,
+      height: 4,
+      decoration: BoxDecoration(
+        color: Tone.line,
+        borderRadius: BorderRadius.circular(4),
+      ),
+    ),
+  );
 
   Widget _buildTitle() => Row(
-        children: [
-          Expanded(
-            child: Text(
-              widget.existing != null ? 'Edit spot' : 'Add a spot',
-              style: GoogleFonts.fraunces(
-                fontSize: 21,
-                fontWeight: FontWeight.w800,
-                color: Tone.ink,
-              ),
-            ),
+    children: [
+      Expanded(
+        child: Text(
+          widget.existing != null ? 'Edit spot' : 'Add a spot',
+          style: GoogleFonts.fraunces(
+            fontSize: 21,
+            fontWeight: FontWeight.w800,
+            color: Tone.ink,
           ),
-          IconButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            icon: const Icon(Icons.close, color: Tone.muted),
-            splashRadius: 20,
-          ),
-        ],
-      );
+        ),
+      ),
+      IconButton(
+        onPressed: () => Navigator.of(context).pop(false),
+        icon: const Icon(Icons.close, color: Tone.muted),
+        splashRadius: 20,
+      ),
+    ],
+  );
 
   Widget _buildSectionLabel(String text) => Text(
-        text,
-        style: GoogleFonts.fraunces(
-          fontSize: 11.5,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 1.2,
-          color: Tone.muted,
-        ),
-      );
+    text,
+    style: GoogleFonts.fraunces(
+      fontSize: 11.5,
+      fontWeight: FontWeight.w700,
+      letterSpacing: 1.2,
+      color: Tone.muted,
+    ),
+  );
 
   Widget _buildSearch() {
     return Column(
@@ -566,7 +604,10 @@ class _AddSpotSheetState extends State<AddSpotSheet> {
                 const SizedBox(
                   width: 16,
                   height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: Tone.muted),
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Tone.muted,
+                  ),
                 ),
             ],
           ),
@@ -581,7 +622,8 @@ class _AddSpotSheetState extends State<AddSpotSheet> {
             child: Column(
               children: [
                 for (var i = 0; i < _suggestions.length; i++) ...[
-                  if (i > 0) const Divider(height: 1, thickness: 1, color: Tone.line),
+                  if (i > 0)
+                    const Divider(height: 1, thickness: 1, color: Tone.line),
                   _SuggestionRow(
                     suggestion: _suggestions[i],
                     onTap: () => _selectPlace(_suggestions[i]),
@@ -689,7 +731,11 @@ class _AddSpotSheetState extends State<AddSpotSheet> {
       children: [
         _buildSectionLabel('NAME'),
         const SizedBox(height: 8),
-        _TextField(controller: _nameController, hint: 'Brew & Books', autofocus: !editing),
+        _TextField(
+          controller: _nameController,
+          hint: 'Brew & Books',
+          autofocus: !editing,
+        ),
         const SizedBox(height: 16),
         _buildSectionLabel('ADDRESS'),
         const SizedBox(height: 8),
@@ -720,7 +766,9 @@ class _AddSpotSheetState extends State<AddSpotSheet> {
   /// in the app that means "bad" for negative (see Tone.error). Tapping a chip's ×
   /// drops it without reopening the picker.
   Widget _buildTagSection() {
-    final selected = _availableLabels.where((l) => _selectedTagSlugs.contains(l.slug)).toList();
+    final selected = _availableLabels
+        .where((l) => _selectedTagSlugs.contains(l.slug))
+        .toList();
 
     return Wrap(
       spacing: 8,
@@ -741,7 +789,11 @@ class _AddSpotSheetState extends State<AddSpotSheet> {
                 const SizedBox(width: 4),
                 Text(
                   'Add Tag',
-                  style: GoogleFonts.fraunces(fontSize: 13, fontWeight: FontWeight.w700, color: Tone.terracotta),
+                  style: GoogleFonts.fraunces(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: Tone.terracotta,
+                  ),
                 ),
               ],
             ),
@@ -749,7 +801,12 @@ class _AddSpotSheetState extends State<AddSpotSheet> {
         ),
         for (final label in selected)
           Container(
-            padding: const EdgeInsets.only(left: 14, right: 8, top: 9, bottom: 9),
+            padding: const EdgeInsets.only(
+              left: 14,
+              right: 8,
+              top: 9,
+              bottom: 9,
+            ),
             decoration: BoxDecoration(
               color: label.isNegative ? Tone.error : Tone.ink,
               borderRadius: BorderRadius.circular(999),
@@ -759,11 +816,16 @@ class _AddSpotSheetState extends State<AddSpotSheet> {
               children: [
                 Text(
                   '#${label.slug}',
-                  style: GoogleFonts.fraunces(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white),
+                  style: GoogleFonts.fraunces(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
                 ),
                 const SizedBox(width: 4),
                 GestureDetector(
-                  onTap: () => setState(() => _selectedTagSlugs.remove(label.slug)),
+                  onTap: () =>
+                      setState(() => _selectedTagSlugs.remove(label.slug)),
                   child: const Padding(
                     padding: EdgeInsets.all(2),
                     child: Icon(Icons.close, size: 14, color: Colors.white),
@@ -775,7 +837,6 @@ class _AddSpotSheetState extends State<AddSpotSheet> {
       ],
     );
   }
-
 
   Widget _buildError() {
     return Container(
@@ -846,7 +907,9 @@ class _AddSpotSheetState extends State<AddSpotSheet> {
                           ),
                         )
                       : Text(
-                          widget.existing != null ? 'Save changes' : 'Save spot',
+                          widget.existing != null
+                              ? 'Save changes'
+                              : 'Save spot',
                           style: GoogleFonts.fraunces(
                             fontSize: 15,
                             fontWeight: FontWeight.w700,
@@ -938,7 +1001,10 @@ class _GroupStudyToggle extends StatelessWidget {
               child: Padding(
                 padding: const EdgeInsets.only(left: 6),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 7,
+                  ),
                   decoration: BoxDecoration(
                     color: value == isYes ? Tone.ink : Tone.field,
                     borderRadius: BorderRadius.circular(999),
@@ -1005,7 +1071,9 @@ class _RatingRow extends StatelessWidget {
                   width: 18,
                   height: 18,
                   decoration: BoxDecoration(
-                    color: value != null && i <= value! ? color : Colors.transparent,
+                    color: value != null && i <= value!
+                        ? color
+                        : Colors.transparent,
                     border: Border.all(
                       color: value != null && i <= value! ? color : Tone.line,
                       width: 2,

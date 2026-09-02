@@ -25,9 +25,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   // Must complete before any other GoogleSignIn.instance call — done once, here, so
   // LoginPage's Google button never has to think about it.
   await GoogleSignIn.instance.initialize();
@@ -93,7 +91,10 @@ class _BootSplash extends StatelessWidget {
             const SizedBox(
               width: 26,
               height: 26,
-              child: CircularProgressIndicator(strokeWidth: 2.5, color: Tone.ink),
+              child: CircularProgressIndicator(
+                strokeWidth: 2.5,
+                color: Tone.ink,
+              ),
             ),
           ],
         ),
@@ -124,11 +125,21 @@ class _BootError extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(_isAuthFailure ? Icons.lock_outline : Icons.cloud_off, size: 32, color: Tone.muted),
+              Icon(
+                _isAuthFailure ? Icons.lock_outline : Icons.cloud_off,
+                size: 32,
+                color: Tone.muted,
+              ),
               const SizedBox(height: 12),
               Text(
-                _isAuthFailure ? "Couldn't sign you in" : "Couldn't reach the server",
-                style: GoogleFonts.fraunces(fontSize: 15, fontWeight: FontWeight.w700, color: Tone.ink),
+                _isAuthFailure
+                    ? "Couldn't sign you in"
+                    : "Couldn't reach the server",
+                style: GoogleFonts.fraunces(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: Tone.ink,
+                ),
               ),
               const SizedBox(height: 4),
               Text(
@@ -136,18 +147,32 @@ class _BootError extends StatelessWidget {
                 textAlign: TextAlign.center,
                 maxLines: 3,
                 overflow: TextOverflow.ellipsis,
-                style: GoogleFonts.fraunces(fontSize: 12.5, fontWeight: FontWeight.w500, color: Tone.muted),
+                style: GoogleFonts.fraunces(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w500,
+                  color: Tone.muted,
+                ),
               ),
               const SizedBox(height: 16),
               InkWell(
                 onTap: auth.bootstrap,
                 borderRadius: BorderRadius.circular(20),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 10),
-                  decoration: BoxDecoration(color: Tone.ink, borderRadius: BorderRadius.circular(20)),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 22,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Tone.ink,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
                   child: Text(
                     'Retry',
-                    style: GoogleFonts.fraunces(fontSize: 13.5, fontWeight: FontWeight.w700, color: Colors.white),
+                    style: GoogleFonts.fraunces(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
                   ),
                 ),
               ),
@@ -173,26 +198,26 @@ extension SpotPresentation on MySpotListItem {
   /// No opening hours: they'd cost a Places lookup per row, so the detail sheet
   /// fetches them instead.
   String get subtitle => [
-        if (address != null && address!.isNotEmpty) address!,
-        if (priceLevel != null && priceLevel! > 0) '\$' * priceLevel!,
-      ].join(' · ');
+    if (address != null && address!.isNotEmpty) address!,
+    if (priceLevel != null && priceLevel! > 0) '\$' * priceLevel!,
+  ].join(' · ');
 
   List<(IconData, String, Level)> get amenities => [
-        (Icons.wifi, 'WiFi', levelFor(ratings.wifi)),
-        (Icons.volume_off, 'Quiet', levelFor(ratings.noise)),
-        (Icons.bolt, 'Outlets', levelFor(ratings.outlets)),
-        (Icons.event_seat, 'Seating', levelFor(ratings.seating)),
-        (Icons.table_restaurant, 'Tables', levelFor(ratings.tableSize)),
-        (Icons.local_cafe, 'Coffee', levelFor(ratings.coffee)),
-      ];
+    (Icons.wifi, 'WiFi', levelFor(ratings.wifi)),
+    (Icons.volume_off, 'Quiet', levelFor(ratings.noise)),
+    (Icons.bolt, 'Outlets', levelFor(ratings.outlets)),
+    (Icons.event_seat, 'Seating', levelFor(ratings.seating)),
+    (Icons.table_restaurant, 'Tables', levelFor(ratings.tableSize)),
+    (Icons.local_cafe, 'Coffee', levelFor(ratings.coffee)),
+  ];
 
   /// Optional free-text fields, shown in the detail sheet when present.
   List<(IconData, String, String)> get details => [
-        if (address != null && address!.isNotEmpty)
-          (Icons.place_outlined, 'Address', address!),
-        if (coffeeOrder != null) (Icons.coffee, 'Usual order', coffeeOrder!),
-        if (notes != null) (Icons.notes, 'Notes', notes!),
-      ];
+    if (address != null && address!.isNotEmpty)
+      (Icons.place_outlined, 'Address', address!),
+    if (coffeeOrder != null) (Icons.coffee, 'Usual order', coffeeOrder!),
+    if (notes != null) (Icons.notes, 'Notes', notes!),
+  ];
 }
 
 // ---------------------------------------------------------------------------
@@ -208,7 +233,7 @@ class SpotsPage extends StatefulWidget {
   State<SpotsPage> createState() => _SpotsPageState();
 }
 
-final _searchBarController = TextEditingController(); 
+final _searchBarController = TextEditingController();
 
 class _SpotsPageState extends State<SpotsPage> {
   // Multi-select, AND semantics: a spot must carry every selected tag to show.
@@ -265,7 +290,10 @@ class _SpotsPageState extends State<SpotsPage> {
   Future<void> _deleteSpot(MySpotListItem spot) async {
     // Drop it from the list first: a Dismissible has to leave the tree as soon as
     // it's dismissed, and the undo below puts it back if asked.
-    setState(() => _spots = [...?_spots]..removeWhere((s) => s.entryId == spot.entryId));
+    setState(
+      () =>
+          _spots = [...?_spots]..removeWhere((s) => s.entryId == spot.entryId),
+    );
 
     try {
       await deleteEntry(spot.spotId);
@@ -350,30 +378,44 @@ class _SpotsPageState extends State<SpotsPage> {
     );
   }
 
-  List<MySpotListItem> get _getVisibleSpots {    
-    // Check if spots is null    
+  List<MySpotListItem> get _getVisibleSpots {
+    // Check if spots is null
     List<MySpotListItem>? spotsToReturn = _spots;
-    if(spotsToReturn == null){
+    if (spotsToReturn == null) {
       return [];
     }
     // Filter by tag first
     spotsToReturn = _filterTags.isEmpty
-      ? spotsToReturn
-      : spotsToReturn.where((s) => _filterTags.every(s.tags.contains)).toList();
+        ? spotsToReturn
+        : spotsToReturn
+              .where((s) => _filterTags.every(s.tags.contains))
+              .toList();
 
     // Then perform fuzzy search
     final query = _searchBarController.text.trim();
-    if (query.isEmpty){
+    if (query.isEmpty) {
       return spotsToReturn;
-    } 
-    
+    }
+
     final fuzzy = Fuzzy(
       spotsToReturn,
       options: FuzzyOptions(
         keys: [
-          WeightedKey<MySpotListItem>(name: 'name', getter: (s) => s.name, weight: 2),
-          WeightedKey<MySpotListItem>(name: 'address', getter: (s) => s.address ?? '', weight: 1),
-          WeightedKey<MySpotListItem>(name: 'tags', getter: (s) => s.tags.join(' '), weight: 1)
+          WeightedKey<MySpotListItem>(
+            name: 'name',
+            getter: (s) => s.name,
+            weight: 2,
+          ),
+          WeightedKey<MySpotListItem>(
+            name: 'address',
+            getter: (s) => s.address ?? '',
+            weight: 1,
+          ),
+          WeightedKey<MySpotListItem>(
+            name: 'tags',
+            getter: (s) => s.tags.join(' '),
+            weight: 1,
+          ),
         ],
         findAllMatches: true,
         tokenize: true,
@@ -419,7 +461,11 @@ class _SpotsPageState extends State<SpotsPage> {
           ),
         ),
       ),
-      bottomNavigationBar: CleanBottomNav(currentIndex: 0, auth: widget.auth, onSpotSaved: _load),
+      bottomNavigationBar: CleanBottomNav(
+        currentIndex: 0,
+        auth: widget.auth,
+        onSpotSaved: _load,
+      ),
     );
   }
 
@@ -463,7 +509,10 @@ class _SpotsPageState extends State<SpotsPage> {
                   _filterTags.isEmpty
                       ? 'No spots yet — tap + to add one'
                       : 'No spots tagged ${_filterTags.map((t) => '#$t').join(', ')}',
-                  style: AppText.body(color: Tone.muted, weight: FontWeight.w600),
+                  style: AppText.body(
+                    color: Tone.muted,
+                    weight: FontWeight.w600,
+                  ),
                 ),
               ],
             ),
@@ -496,7 +545,7 @@ class _SpotsPageState extends State<SpotsPage> {
       ],
     ];
   }
-  
+
   Widget _buildHeader(int? count) {
     final countLabel = switch (count) {
       null => '',
@@ -524,8 +573,14 @@ class _SpotsPageState extends State<SpotsPage> {
                   color: tone.icon,
                 )
               : Text(
-                  (me?.displayName.isNotEmpty ?? false) ? me!.displayName[0].toUpperCase() : '?',
-                  style: GoogleFonts.fraunces(fontSize: 22, fontWeight: FontWeight.w800, color: tone.icon),
+                  (me?.displayName.isNotEmpty ?? false)
+                      ? me!.displayName[0].toUpperCase()
+                      : '?',
+                  style: GoogleFonts.fraunces(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
+                    color: tone.icon,
+                  ),
                 ),
         ),
         const SizedBox(width: 12),
@@ -549,7 +604,11 @@ class _SpotsPageState extends State<SpotsPage> {
               // small tri-color accent line
               Row(
                 children: [
-                  for (final c in const [Tone.terracotta, Tone.slate, Tone.sage])
+                  for (final c in const [
+                    Tone.terracotta,
+                    Tone.slate,
+                    Tone.sage,
+                  ])
                     Container(
                       width: 16,
                       height: 3,
@@ -577,8 +636,8 @@ class _SpotsPageState extends State<SpotsPage> {
     );
   }
 
-  Widget _buildSearchBar() {    
-    return InkWell(      
+  Widget _buildSearchBar() {
+    return InkWell(
       borderRadius: BorderRadius.circular(12),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14),
@@ -588,7 +647,7 @@ class _SpotsPageState extends State<SpotsPage> {
         ),
         child: Row(
           children: [
-            const Icon(Icons.search, size: 20, color: Tone.muted),            
+            const Icon(Icons.search, size: 20, color: Tone.muted),
             const SizedBox(width: 8),
             Expanded(
               child: TextField(
@@ -602,7 +661,7 @@ class _SpotsPageState extends State<SpotsPage> {
                     fontWeight: FontWeight.w500,
                     color: Tone.muted,
                   ),
-                ),                            
+                ),
                 style: GoogleFonts.fraunces(
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
@@ -615,12 +674,14 @@ class _SpotsPageState extends State<SpotsPage> {
       ),
     );
   }
+
   // Options come from whatever tags are actually present on the loaded spots, not
   // the full global label list — a chip that would always show zero results isn't
   // worth offering.
   Widget _buildFilters() {
-    final tags = {for (final s in _spots ?? const <MySpotListItem>[]) ...s.tags}.toList()
-      ..sort();
+    final tags = {
+      for (final s in _spots ?? const <MySpotListItem>[]) ...s.tags,
+    }.toList()..sort();
 
     if (tags.isEmpty) return const SizedBox.shrink();
 
@@ -636,8 +697,10 @@ class _SpotsPageState extends State<SpotsPage> {
               }),
               borderRadius: BorderRadius.circular(20),
               child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
                   color: _filterTags.contains(tag) ? Tone.ink : Tone.field,
                   borderRadius: BorderRadius.circular(20),
@@ -703,8 +766,7 @@ class _ErrorBox extends StatelessWidget {
             onTap: onRetry,
             borderRadius: BorderRadius.circular(20),
             child: Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 22, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 10),
               decoration: BoxDecoration(
                 color: Tone.ink,
                 borderRadius: BorderRadius.circular(20),
@@ -806,7 +868,7 @@ class SpotRow extends StatelessWidget {
                   color: Tone.muted,
                 ),
               ),
-            ),            
+            ),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -871,7 +933,6 @@ class SpotRow extends StatelessWidget {
   }
 }
 
-
 /// A non-interactive `#slug` pill row — the row/detail-sheet display counterpart to
 /// the tappable filter chips in `_buildFilters` and the tappable picker chips in
 /// add_spot_sheet.dart. Same visual language, different behavior.
@@ -905,20 +966,20 @@ class _TagPills extends StatelessWidget {
   }
 
   Widget _pill(String tag) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-        decoration: BoxDecoration(
-          color: Tone.field,
-          borderRadius: BorderRadius.circular(999),
-        ),
-        child: Text(
-          '#$tag',
-          style: GoogleFonts.fraunces(
-            fontSize: 11.5,
-            fontWeight: FontWeight.w700,
-            color: Tone.ink,
-          ),
-        ),
-      );
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+    decoration: BoxDecoration(
+      color: Tone.field,
+      borderRadius: BorderRadius.circular(999),
+    ),
+    child: Text(
+      '#$tag',
+      style: GoogleFonts.fraunces(
+        fontSize: 11.5,
+        fontWeight: FontWeight.w700,
+        color: Tone.ink,
+      ),
+    ),
+  );
 }
 
 class _ScoreBubble extends StatelessWidget {
@@ -985,7 +1046,8 @@ class SpotDetailSheet extends StatelessWidget {
       barrierColor: Colors.black26,
       barrierDismissible: true,
       transitionDuration: const Duration(milliseconds: 150),
-      pageBuilder: (context, animation, secondaryAnimation) => _Toast(message: message),
+      pageBuilder: (context, animation, secondaryAnimation) =>
+          _Toast(message: message),
     );
   }
 
@@ -1005,7 +1067,9 @@ class SpotDetailSheet extends StatelessWidget {
 
     final uri = Platform.isIOS
         ? Uri.parse('https://maps.apple.com/?daddr=$query')
-        : Uri.parse('https://www.google.com/maps/dir/?api=1&destination=$query');
+        : Uri.parse(
+            'https://www.google.com/maps/dir/?api=1&destination=$query',
+          );
 
     final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
     if (!opened && context.mounted) _soon(context, "Couldn't open Maps");
@@ -1035,13 +1099,15 @@ class SpotDetailSheet extends StatelessWidget {
         ),
         child: SafeArea(
           top: false,
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(22, 12, 22, 22),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Kept outside the scroll view — like AddSpotSheet's handle — so a
+              // swipe here always reaches the modal sheet's own drag-to-dismiss
+              // gesture instead of being swallowed as a scroll.
+              Padding(
+                padding: const EdgeInsets.only(top: 12, bottom: 20),
+                child: Center(
                   child: Container(
                     width: 40,
                     height: 4,
@@ -1051,221 +1117,239 @@ class SpotDetailSheet extends StatelessWidget {
                     ),
                   ),
                 ),
-                const SizedBox(height: 20),
-                Row(
-                  children: [                    
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            spot.name,
-                            style: GoogleFonts.fraunces(
-                              fontSize: 19,
-                              fontWeight: FontWeight.w800,
-                              color: Tone.ink,
-                              height: 1.15,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          _HoursLine(spot: spot),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    _ScoreBubble(score: spot.score, heroTag: 'score-${spot.entryId}'),
-                  ],
-                ),
-                const SizedBox(height: 14),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _SheetButton(
-                        label: 'Log a visit',
-                        icon: Icons.edit_calendar_outlined,
-                        filled: true,
-                        onTap: () => _logVisit(context),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: _SheetButton(
-                        label: 'Past visits',
-                        icon: Icons.history,
-                        filled: false,
-                        onTap: () => _pastVisits(context),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 20),
-                const Divider(height: 1, thickness: 1, color: Tone.line),
-                const SizedBox(height: 16),
-                Text(
-                  'THE RUNDOWN',
-                  style: GoogleFonts.fraunces(
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 1.2,
-                    color: Tone.muted,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                for (final (icon, label, level) in spot.amenities)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    child: Row(
-                      children: [
-                        Icon(icon, size: 19, color: Tone.muted),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            label,
-                            style: GoogleFonts.fraunces(
-                              fontSize: 14.5,
-                              fontWeight: FontWeight.w600,
-                              color: Tone.ink,
-                            ),
-                          ),
-                        ),
-                        Container(
-                          width: 8,
-                          height: 8,
-                          margin: const EdgeInsets.only(right: 8),
-                          decoration: BoxDecoration(
-                            color: level.color,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                        Text(
-                          level.display,
-                          style: GoogleFonts.fraunces(
-                            fontSize: 13.5,
-                            fontWeight: FontWeight.w700,
-                            color: level.color,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                // Sits with the ratings but renders differently on purpose — it's a
-                // yes/no, so it gets no 1-5 dot and no Level colour ramp.
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: Row(
+              ),
+              Flexible(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(22, 0, 22, 22),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(Icons.groups, size: 19, color: Tone.muted),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          'Group study',
-                          style: GoogleFonts.fraunces(
-                            fontSize: 14.5,
-                            fontWeight: FontWeight.w600,
-                            color: Tone.ink,
-                          ),
-                        ),
-                      ),
-                      Text(
-                        spot.groupStudy ? 'Works' : 'Not really',
-                        style: GoogleFonts.fraunces(
-                          fontSize: 13.5,
-                          fontWeight: FontWeight.w700,
-                          color: spot.groupStudy ? Tone.sage : Tone.muted,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                if (spot.tags.isNotEmpty) ...[
-                  const SizedBox(height: 10),
-                  Text(
-                    'TAGS',
-                    style: GoogleFonts.fraunces(
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 1.2,
-                      color: Tone.muted,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  // My own tags, not the spot-wide aggregate — everyone's opinion
-                  // would need a second request (SpotDetail, not MySpotListItem).
-                  _TagPills(tags: spot.tags),
-                ],
-                if (spot.details.isNotEmpty) ...[
-                  const SizedBox(height: 10),
-                  Text(
-                    'DETAILS',
-                    style: GoogleFonts.fraunces(
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 1.2,
-                      color: Tone.muted,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  for (final (icon, label, value) in spot.details)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                      Row(
                         children: [
-                          Icon(icon, size: 19, color: Tone.muted),
                           const SizedBox(width: 12),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  label,
+                                  spot.name,
                                   style: GoogleFonts.fraunces(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                    color: Tone.muted,
+                                    fontSize: 19,
+                                    fontWeight: FontWeight.w800,
+                                    color: Tone.ink,
+                                    height: 1.15,
                                   ),
                                 ),
                                 const SizedBox(height: 2),
-                                Text(
-                                  value,
+                                _HoursLine(spot: spot),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          _ScoreBubble(
+                            score: spot.score,
+                            heroTag: 'score-${spot.entryId}',
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _SheetButton(
+                              label: 'Log a visit',
+                              icon: Icons.edit_calendar_outlined,
+                              filled: true,
+                              onTap: () => _logVisit(context),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: _SheetButton(
+                              label: 'Past visits',
+                              icon: Icons.history,
+                              filled: false,
+                              onTap: () => _pastVisits(context),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+                      const Divider(height: 1, thickness: 1, color: Tone.line),
+                      const SizedBox(height: 16),
+                      Text(
+                        'THE RUNDOWN',
+                        style: GoogleFonts.fraunces(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 1.2,
+                          color: Tone.muted,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      for (final (icon, label, level) in spot.amenities)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          child: Row(
+                            children: [
+                              Icon(icon, size: 19, color: Tone.muted),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  label,
                                   style: GoogleFonts.fraunces(
                                     fontSize: 14.5,
                                     fontWeight: FontWeight.w600,
                                     color: Tone.ink,
                                   ),
                                 ),
+                              ),
+                              Container(
+                                width: 8,
+                                height: 8,
+                                margin: const EdgeInsets.only(right: 8),
+                                decoration: BoxDecoration(
+                                  color: level.color,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              Text(
+                                level.display,
+                                style: GoogleFonts.fraunces(
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: level.color,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      // Sits with the ratings but renders differently on purpose — it's a
+                      // yes/no, so it gets no 1-5 dot and no Level colour ramp.
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.groups,
+                              size: 19,
+                              color: Tone.muted,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                'Group study',
+                                style: GoogleFonts.fraunces(
+                                  fontSize: 14.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: Tone.ink,
+                                ),
+                              ),
+                            ),
+                            Text(
+                              spot.groupStudy ? 'Works' : 'Not really',
+                              style: GoogleFonts.fraunces(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w700,
+                                color: spot.groupStudy ? Tone.sage : Tone.muted,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (spot.tags.isNotEmpty) ...[
+                        const SizedBox(height: 10),
+                        Text(
+                          'TAGS',
+                          style: GoogleFonts.fraunces(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 1.2,
+                            color: Tone.muted,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        // My own tags, not the spot-wide aggregate — everyone's opinion
+                        // would need a second request (SpotDetail, not MySpotListItem).
+                        _TagPills(tags: spot.tags),
+                      ],
+                      if (spot.details.isNotEmpty) ...[
+                        const SizedBox(height: 10),
+                        Text(
+                          'DETAILS',
+                          style: GoogleFonts.fraunces(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 1.2,
+                            color: Tone.muted,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        for (final (icon, label, value) in spot.details)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Icon(icon, size: 19, color: Tone.muted),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        label,
+                                        style: GoogleFonts.fraunces(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                          color: Tone.muted,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        value,
+                                        style: GoogleFonts.fraunces(
+                                          fontSize: 14.5,
+                                          fontWeight: FontWeight.w600,
+                                          color: Tone.ink,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
                               ],
+                            ),
+                          ),
+                      ],
+                      const SizedBox(height: 18),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _SheetButton(
+                              label: 'Directions',
+                              icon: Icons.near_me,
+                              filled: true,
+                              onTap: () => _openDirections(context),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _SheetButton(
+                              label: 'Edit spot',
+                              icon: Icons.edit_outlined,
+                              filled: false,
+                              onTap: () => _editSpot(context),
                             ),
                           ),
                         ],
                       ),
-                    ),
-                ],
-                const SizedBox(height: 18),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _SheetButton(
-                        label: 'Directions',
-                        icon: Icons.near_me,
-                        filled: true,
-                        onTap: () => _openDirections(context),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _SheetButton(
-                        label: 'Edit spot',
-                        icon: Icons.edit_outlined,
-                        filled: false,
-                        onTap: () => _editSpot(context),
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
@@ -1285,13 +1369,18 @@ class _UndoToast extends StatefulWidget {
   /// its Overlay.
   final VoidCallback onDismissed;
 
-  const _UndoToast({required this.message, required this.onUndo, required this.onDismissed});
+  const _UndoToast({
+    required this.message,
+    required this.onUndo,
+    required this.onDismissed,
+  });
 
   @override
   State<_UndoToast> createState() => _UndoToastState();
 }
 
-class _UndoToastState extends State<_UndoToast> with SingleTickerProviderStateMixin {
+class _UndoToastState extends State<_UndoToast>
+    with SingleTickerProviderStateMixin {
   late final AnimationController _controller = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 220),
@@ -1342,12 +1431,16 @@ class _UndoToastState extends State<_UndoToast> with SingleTickerProviderStateMi
       // bar's top. Clearing the raised "+" button means clearing all of: the device's
       // bottom safe-area inset, the bar's own content height, and how far the button
       // pokes above the bar - not just that last part on its own.
-      bottom: MediaQuery.of(context).padding.bottom +
+      bottom:
+          MediaQuery.of(context).padding.bottom +
           CleanBottomNav._barHeight +
           CleanBottomNav._overlap +
           16,
       child: SlideTransition(
-        position: Tween<Offset>(begin: const Offset(0, 0.4), end: Offset.zero).animate(curved),
+        position: Tween<Offset>(
+          begin: const Offset(0, 0.4),
+          end: Offset.zero,
+        ).animate(curved),
         child: FadeTransition(
           opacity: curved,
           child: Material(
@@ -1363,14 +1456,20 @@ class _UndoToastState extends State<_UndoToast> with SingleTickerProviderStateMi
                   Expanded(
                     child: Text(
                       widget.message,
-                      style: GoogleFonts.fraunces(color: Colors.white, fontWeight: FontWeight.w600),
+                      style: GoogleFonts.fraunces(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                   TextButton(
                     onPressed: _undo,
                     child: Text(
                       'Undo',
-                      style: GoogleFonts.fraunces(color: Tone.terracotta, fontWeight: FontWeight.w700),
+                      style: GoogleFonts.fraunces(
+                        color: Tone.terracotta,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
                 ],
@@ -1430,9 +1529,6 @@ class _ToastState extends State<_Toast> {
   }
 }
 
-/// Opening hours are never stored — they're fetched from Google when the sheet
-/// opens. So this renders the category immediately and fills in "Until 22:00" if
-/// and when the lookup lands, staying quiet when Google has no hours to give.
 class _HoursLine extends StatefulWidget {
   final MySpotListItem spot;
 
@@ -1553,7 +1649,12 @@ class CleanBottomNav extends StatelessWidget {
   /// refresh its list in place. Left null on tabs with no list to refresh.
   final VoidCallback? onSpotSaved;
 
-  const CleanBottomNav({super.key, required this.currentIndex, required this.auth, this.onSpotSaved});
+  const CleanBottomNav({
+    super.key,
+    required this.currentIndex,
+    required this.auth,
+    this.onSpotSaved,
+  });
 
   void _select(BuildContext context, int index) {
     if (index == currentIndex) return;
@@ -1569,7 +1670,9 @@ class CleanBottomNav extends StatelessWidget {
       _ => ProfilePage(auth: auth),
     };
 
-    Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => page));
+    Navigator.of(
+      context,
+    ).pushReplacement(MaterialPageRoute(builder: (_) => page));
   }
 
   Future<void> _addSpot(BuildContext context) async {
@@ -1661,7 +1764,10 @@ class _NotchedTopBorderPainter extends CustomPainter {
   final double buttonCenterY;
   final double notchRadius;
 
-  const _NotchedTopBorderPainter({required this.buttonCenterY, required this.notchRadius});
+  const _NotchedTopBorderPainter({
+    required this.buttonCenterY,
+    required this.notchRadius,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -1710,7 +1816,8 @@ class _NotchedTopBorderPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _NotchedTopBorderPainter oldDelegate) =>
-      oldDelegate.buttonCenterY != buttonCenterY || oldDelegate.notchRadius != notchRadius;
+      oldDelegate.buttonCenterY != buttonCenterY ||
+      oldDelegate.notchRadius != notchRadius;
 }
 
 class _NavItem extends StatelessWidget {
@@ -1754,4 +1861,3 @@ class _NavItem extends StatelessWidget {
     );
   }
 }
-
