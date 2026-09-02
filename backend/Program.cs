@@ -457,7 +457,8 @@ registered.MapGet("/labels", async (AppDbContext db, CancellationToken ct) =>
 // rejected slug is a 409 rather than silently resurrecting it - no "reconsider"
 // endpoint this pass, an admin re-opens it by hand-editing the row.
 registered.MapPost("/labels", async (
-    RequestLabelRequest request, CurrentUser currentUser, AppDbContext db, CancellationToken ct) =>
+    RequestLabelRequest request, CurrentUser currentUser, AppDbContext db,
+    FeedbackMailer mailer, ILogger<FeedbackMailer> logger, CancellationToken ct) =>
 {
     var slug = Slugify(request.Name);
     var displayName = request.Name?.Trim();
@@ -485,7 +486,7 @@ registered.MapPost("/labels", async (
         return Results.Ok(new LabelDto(existing.Id, existing.Slug, existing.DisplayName, existing.Status, existing.Polarity));
     }
 
-    var requestedBy = await currentUser.IdAsync(ct);
+    var user = (await currentUser.GetAsync(ct))!;
 
     var created = new Label
     {
@@ -493,11 +494,26 @@ registered.MapPost("/labels", async (
         Slug = slug,
         DisplayName = displayName,
         Status = LabelStatuses.Pending,
-        RequestedBy = requestedBy,
+        RequestedBy = user.Id,
     };
 
     db.Labels.Add(created);
     await db.SaveChangesAsync(ct);
+
+    // Best-effort, like SendAsync above but never blocking: the label is already saved
+    // and sits in the moderation queue regardless, so a failed or unconfigured mailer
+    // shouldn't turn a successful request into an error for the submitter.
+    if (mailer.IsConfigured)
+    {
+        try
+        {
+            await mailer.SendTagRequestAsync(displayName, slug, user.DisplayName, user.Handle, ct);
+        }
+        catch (Exception e)
+        {
+            logger.LogWarning(e, "Failed to send tag request email");
+        }
+    }
 
     return Results.Created(
         $"/labels/{created.Id}",

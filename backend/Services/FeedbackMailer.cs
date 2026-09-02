@@ -20,16 +20,36 @@ public class FeedbackMailer(IConfiguration configuration, ILogger<FeedbackMailer
         !string.IsNullOrWhiteSpace(_smtpAppPassword) &&
         !string.IsNullOrWhiteSpace(_recipient);
 
-    public async Task SendAsync(
+    public Task SendAsync(
         string type, string message, string displayName, string handle, CancellationToken ct = default)
+    {
+        var email = new MimeMessage();
+        email.Subject = $"[Studease feedback] {type}";
+        email.Body = new TextPart("plain") { Text = $"From: {displayName} (@{handle})\nType: {type}\n\n{message}" };
+        return SendCoreAsync(email, ct);
+    }
+
+    // Same inbox, same delivery path as feedback — mirrors it rather than getting its own
+    // service, since it's just as low-volume and the point is the same: one email lands
+    // in the one Gmail account already checked daily. No tag-request table either.
+    public Task SendTagRequestAsync(
+        string tagName, string slug, string displayName, string handle, CancellationToken ct = default)
+    {
+        var email = new MimeMessage();
+        email.Subject = $"[Studease tag request] {tagName}";
+        email.Body = new TextPart("plain")
+        {
+            Text = $"From: {displayName} (@{handle})\n\nRequested tag: \"{tagName}\" (slug: {slug})",
+        };
+        return SendCoreAsync(email, ct);
+    }
+
+    private async Task SendCoreAsync(MimeMessage email, CancellationToken ct)
     {
         if (!IsConfigured) throw new InvalidOperationException("FeedbackMailer is not configured");
 
-        var email = new MimeMessage();
         email.From.Add(MailboxAddress.Parse(_smtpUser!));
         email.To.Add(MailboxAddress.Parse(_recipient!));
-        email.Subject = $"[Studease feedback] {type}";
-        email.Body = new TextPart("plain") { Text = $"From: {displayName} (@{handle})\nType: {type}\n\n{message}" };
 
         using var client = new SmtpClient();
         try
